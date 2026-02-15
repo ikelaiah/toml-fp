@@ -11,6 +11,9 @@
         <OtherUnitFiles Value="..\..\src"/>
         <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
       </SearchPaths>
+      <Other>
+        <CustomOptions Value="-FcUTF8"/>
+      </Other>
     </CompilerOptions>
     <Description Value="A robust TOML (Tom&apos;s Obvious, Minimal Language) parser and serializer for Free Pascal, almost fully compliant with the TOML v1.0.0 specification."/>
     <License Value="MIT License
@@ -34,7 +37,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."/>
-    <Version Major="1" Minor="1"/>
+    <Version Major="1" Release="3"/>
     <Files>
       <Item>
         <Filename Value="..\..\src\TOML.Parser.pas"/>
