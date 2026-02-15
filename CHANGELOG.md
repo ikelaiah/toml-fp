@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Changelog
 
+### v1.0.3 - Bug Fixes (2026-02-15)
+
+- Fixed parser navigation for dotted table paths when an intermediate key is an array of tables (e.g., `[fruits.physical]` after `[[fruits]]`).
+- Added support for resolving intermediate `TTOMLArray` values to the last table element during table path traversal.
+- Improved parser error message to clarify invalid intermediate values as "table or array of tables".
+- Added regression test `Test69_1_ArrayOfTablesWithSubtables` for array-of-tables with subtables and nested array-of-tables.
+
 ### v1.0.2 - Bug Fixes (2025-05-18)
 
 - Fixed `NeedsQuoting` function to properly conform to TOML specification for bare keys
