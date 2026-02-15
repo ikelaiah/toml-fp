@@ -4,13 +4,13 @@
 [![Free Pascal](https://img.shields.io/badge/Free%20Pascal-3.2.2-blue.svg)](https://www.freepascal.org/)
 [![Lazarus](https://img.shields.io/badge/Lazarus-4.0-orange.svg)](https://www.lazarus-ide.org/)
 [![TOML](https://img.shields.io/badge/TOML-1.0.0-green.svg)](https://toml.io/)
-[![Version](https://img.shields.io/badge/Version-1.0.2-blueviolet.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.0.3-blueviolet.svg)]()
 
 A robust [TOML (Tom's Obvious, Minimal Language)](https://toml.io/) parser and serializer for Free Pascal, _almost_ fully compliant with the TOML v1.0.0 specification.
 
 > [!NOTE] 
 > 
-> Our extensive test suite (59 tests) ensures that TOML-FP adheres to the TOML v1.0.0 specification, covering all essential data types, structures, and edge cases.
+> Our extensive test suite (60 tests) ensures that TOML-FP adheres to the TOML v1.0.0 specification, covering all essential data types, structures, and edge cases.
 
 ## Table of Contents
 
@@ -63,7 +63,7 @@ TOML-FP provides a complete solution for working with TOML configuration files i
 - **Error Handling:** Detailed error messages and exception handling
 - **Serialization:** Convert Pascal objects to TOML and back
 - **Documentation:** Comprehensive examples and API documentation
-- **Test Suite:** Comprehensive test suite (59 items)
+- **Test Suite:** Comprehensive test suite (60 items)
 
 ## To Do / In Progress
 
@@ -497,7 +497,7 @@ Serializes a `TTOMLValue` and saves it to the specified file. Returns `True` on 
 
 ## Testing
 
-The library includes a comprehensive test suite (59 items). 
+The library includes a comprehensive test suite (60 items). 
 
 To run the tests:
 
@@ -523,20 +523,20 @@ See [Test-Coverage-Overview.md](docs/Test-Coverage-Overview.md) for details.
 
 ```bash
 $ ./TestRunner.exe -a --format=plain
- Time:00.008 N:56 E:0 F:0 I:0
-  TTOMLTestCase Time:00.008 N:56 E:0 F:0 I:0
+ Time:00.049 N:60 E:0 F:0 I:0
+  TTOMLTestCase Time:00.049 N:60 E:0 F:0 I:0
     Test01_StringValue
     Test02_IntegerValue
     ...
-    Test70_ComplexKeys
+    Test72_LiteralDottedKeyTable
 
-Number of run tests: 56
+Number of run tests: 60
 Number of errors:    0
 Number of failures:  0
 
 Heap dump by heaptrc unit of path\to\TestRunner.exe
-2991 memory blocks allocated : 195551/208600
-2991 memory blocks freed     : 195551/208600
+3871 memory blocks allocated : 248475/265224
+3871 memory blocks freed     : 248475/265224
 0 unfreed memory blocks : 0
 True heap size : 294912 (256 used in System startup)
 True free heap : 294656
@@ -574,4 +574,5 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 - TOML specification creators and maintainers
 - Free Pascal and Lazarus communities
+- [SilenceCFF](https://github.com/SilenceCCF)
 - All contributors to this project

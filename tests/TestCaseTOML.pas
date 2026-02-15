@@ -79,6 +79,7 @@ type
     procedure Test67_ArrayTypeValidation;
     procedure Test68_KeyValidation;
     procedure Test69_TableArrayNesting;
+    procedure Test69_1_ArrayOfTablesWithSubtables;
     procedure Test70_ComplexKeys;
     procedure Test71_HierarchicalNestedTable;
     procedure Test72_LiteralDottedKeyTable;
@@ -1290,6 +1291,66 @@ begin
     AssertTrue('Second fruit varieties exist', FruitTable.TryGetValue('varieties', Value));
     AssertTrue('Second variety name exists', Value.AsTable.TryGetValue('name', Value));
     AssertEquals('Second variety name', 'plantain', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test69_1_ArrayOfTablesWithSubtables;
+var
+  TOML: string;
+  Doc: TTOMLTable;
+  Value, SubValue: TTOMLValue;
+  Fruits, Varieties: TTOMLArray;
+  FruitTable, PhysicalTable: TTOMLTable;
+begin
+  TOML := '[[fruits]]' + LineEnding +
+          'name = "apple"' + LineEnding +
+          '[fruits.physical]' + LineEnding +
+          'color = "red"' + LineEnding +
+          'shape = "round"' + LineEnding +
+          '[[fruits.varieties]]' + LineEnding +
+          'name = "red delicious"' + LineEnding +
+          '[[fruits.varieties]]' + LineEnding +
+          'name = "granny smith"' + LineEnding +
+          '[[fruits]]' + LineEnding +
+          'name = "banana"' + LineEnding +
+          '[[fruits.varieties]]' + LineEnding +
+          'name = "plantain"';
+  Doc := ParseTOML(TOML);
+  try
+    AssertTrue('Fruits array exists', Doc.TryGetValue('fruits', Value));
+    Fruits := Value.AsArray;
+    AssertEquals('Fruits count', 2, Fruits.Count);
+    
+    FruitTable := Fruits.Items[0].AsTable;
+    AssertTrue('First fruit name exists', FruitTable.TryGetValue('name', Value));
+    AssertEquals('First fruit name', 'apple', Value.AsString);
+    
+    AssertTrue('Physical exists', FruitTable.TryGetValue('physical', Value));
+    PhysicalTable := Value.AsTable;
+    AssertTrue('Physical color exists', PhysicalTable.TryGetValue('color', SubValue));
+    AssertEquals('Physical color', 'red', SubValue.AsString);
+    AssertTrue('Physical shape exists', PhysicalTable.TryGetValue('shape', SubValue));
+    AssertEquals('Physical shape', 'round', SubValue.AsString);
+    
+    AssertTrue('Varieties exists', FruitTable.TryGetValue('varieties', Value));
+    Varieties := Value.AsArray;
+    AssertEquals('Varieties count', 2, Varieties.Count);
+    AssertTrue('First variety name exists', Varieties.Items[0].AsTable.TryGetValue('name', SubValue));
+    AssertEquals('First variety name', 'red delicious', SubValue.AsString);
+    AssertTrue('Second variety name exists', Varieties.Items[1].AsTable.TryGetValue('name', SubValue));
+    AssertEquals('Second variety name', 'granny smith', SubValue.AsString);
+    
+    FruitTable := Fruits.Items[1].AsTable;
+    AssertTrue('Second fruit name exists', FruitTable.TryGetValue('name', Value));
+    AssertEquals('Second fruit name', 'banana', Value.AsString);
+    
+    AssertTrue('Second fruit varieties exist', FruitTable.TryGetValue('varieties', Value));
+    Varieties := Value.AsArray;
+    AssertEquals('Second varieties count', 1, Varieties.Count);
+    AssertTrue('Second fruit variety name exists', Varieties.Items[0].AsTable.TryGetValue('name', SubValue));
+    AssertEquals('Second fruit variety name', 'plantain', SubValue.AsString);
   finally
     Doc.Free;
   end;

@@ -1311,8 +1311,16 @@ begin
                 Value := TTOMLTable.Create;
                 CurrentTable.Add(Key, Value);
               end;
+              if Value is TTOMLArray then
+              begin
+                ArrayValue := TTOMLArray(Value);
+                if ArrayValue.Count = 0 then
+                  raise ETOMLParserException.CreateFmt('Array %s is empty at line %d, column %d',
+                    [Key, FCurrentToken.Line, FCurrentToken.Column]);
+                Value := ArrayValue.Items[ArrayValue.Count - 1];
+              end;
               if not (Value is TTOMLTable) then
-                raise ETOMLParserException.CreateFmt('Key %s is not a table at line %d, column %d',
+                raise ETOMLParserException.CreateFmt('Key %s is not a table or array of tables at line %d, column %d',
                   [Key, FCurrentToken.Line, FCurrentToken.Column]);
               CurrentTable := TTOMLTable(Value);
             end;
