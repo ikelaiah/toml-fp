@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Changelog
 
+### v1.0.4 - Bug Fixes (2026-03-09)
+
+- Implemented TOML 1.0 Unicode escape parsing for basic strings (`\uXXXX` and `\UXXXXXXXX`).
+- Added missing basic-string escape support for backspace (`\b`) and form feed (`\f`).
+- Fixed multiline string handling to trim the first newline in multiline literal strings and to honor line-ending backslash whitespace trimming in multiline basic strings.
+- Fixed local time tokenization and parsing for bare TOML time values such as `07:32:00`.
+- Tightened numeric validation to reject invalid underscore placement, decimal leading zeros, and hexadecimal floating-point syntax.
+- Fixed serializer output for quoted dotted keys so table headers and arrays of tables preserve literal dotted keys instead of splitting them into paths.
+- Added regression coverage for Unicode escapes, multiline string trimming, local-time parsing, numeric validation, inline quoted dotted keys, and quoted array-of-table serialization.
+
 ### v1.0.3 - Bug Fixes (2026-02-15)
 
 - Fixed parser navigation for dotted table paths when an intermediate key is an array of tables (e.g., `[fruits.physical]` after `[[fruits]]`).

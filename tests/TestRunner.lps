@@ -11,7 +11,7 @@
         <EditorIndex Value="2"/>
         <TopLine Value="6"/>
         <CursorPos X="4" Y="17"/>
-        <UsageCount Value="57"/>
+        <UsageCount Value="59"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -19,7 +19,7 @@
         <IsPartOfProject Value="True"/>
         <TopLine Value="1295"/>
         <CursorPos X="6" Y="1303"/>
-        <UsageCount Value="57"/>
+        <UsageCount Value="59"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -29,23 +29,19 @@
       </Unit>
       <Unit>
         <Filename Value="..\src\TOML.Parser.pas"/>
+        <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="1211"/>
-        <CursorPos X="5" Y="1217"/>
-        <UsageCount Value="28"/>
+        <TopLine Value="1175"/>
+        <CursorPos X="79" Y="1188"/>
+        <UsageCount Value="29"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\src\TOML.Serializer.pas"/>
-        <IsVisibleTab Value="True"/>
         <EditorIndex Value="4"/>
-        <TopLine Value="221"/>
-<<<<<<< HEAD
-        <CursorPos X="51" Y="232"/>
-=======
-        <CursorPos X="14" Y="227"/>
->>>>>>> d2adbd610a19bf24c388025c71ac602130546539
-        <UsageCount Value="28"/>
+        <TopLine Value="222"/>
+        <CursorPos X="14" Y="223"/>
+        <UsageCount Value="29"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -53,15 +49,11 @@
         <EditorIndex Value="3"/>
         <TopLine Value="280"/>
         <CursorPos X="5" Y="287"/>
-        <UsageCount Value="20"/>
+        <UsageCount Value="21"/>
         <Loaded Value="True"/>
       </Unit>
     </Units>
     <JumpHistory HistoryIndex="29">
-      <Position>
-        <Filename Value="..\src\TOML.Serializer.pas"/>
-        <Caret Line="8" Column="54"/>
-      </Position>
       <Position>
         <Filename Value="..\src\TOML.Serializer.pas"/>
         <Caret Line="224" Column="18" TopLine="219"/>
@@ -177,6 +169,10 @@
       <Position>
         <Filename Value="TestCaseTOML.pas"/>
         <Caret Line="276" Column="56" TopLine="275"/>
+      </Position>
+      <Position>
+        <Filename Value="..\src\TOML.Serializer.pas"/>
+        <Caret Line="223" Column="14" TopLine="222"/>
       </Position>
     </JumpHistory>
     <RunParams>

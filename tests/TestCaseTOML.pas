@@ -46,6 +46,7 @@ type
     procedure Test36_1_SerializeHierarchicalNestedTable;
     procedure Test36_2_SerializeLiteralDottedKeyTable;
     procedure Test37_SerializeArrayOfTables;
+    procedure Test37_1_SerializeArrayOfTablesWithQuotedKey;
     
     { Error Cases }
     procedure Test40_InvalidInteger;
@@ -56,11 +57,17 @@ type
     
     { TOML v1.0.0 Specification Tests }
     procedure Test50_MultilineString;
+    procedure Test50_1_UnicodeEscapeSequences;
+    procedure Test50_2_BasicStringAdditionalEscapes;
+    procedure Test50_3_MultilineBasicBackslashTrim;
     procedure Test51_LiteralString;
     procedure Test52_MultilineLiteralString;
+    procedure Test52_1_MultilineLiteralStringSkipsInitialNewline;
     procedure Test53_IntegerWithUnderscores;
+    procedure Test53_1_InvalidNumericUnderscores;
     procedure Test54_HexOctBinIntegers;
     procedure Test55_FloatWithUnderscores;
+    procedure Test55_1_RejectHexFloat;
     procedure Test56_LocalDateTime;
     procedure Test57_LocalDate;
     procedure Test58_LocalTime;
@@ -74,6 +81,7 @@ type
     procedure Test62_OffsetDateTime;
     procedure Test63_MultilineArray;
     procedure Test64_QuotedKeys;
+    procedure Test64_1_DottedQuotedKeysInInlineTable;
     procedure Test65_SuperTables;
     procedure Test66_WhitespaceHandling;
     procedure Test67_ArrayTypeValidation;
@@ -640,6 +648,42 @@ begin
   end;
 end;
 
+procedure TTOMLTestCase.Test37_1_SerializeArrayOfTablesWithQuotedKey;
+var
+  Doc: TTOMLTable;
+  Items: TTOMLArray;
+  Entry: TTOMLTable;
+  TOML: string;
+  ParsedDoc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := TTOMLTable.Create;
+  try
+    Items := TTOMLArray.Create;
+    Entry := TTOMLTable.Create;
+    Entry.Add('name', TTOMLString.Create('apple'));
+    Items.Add(Entry);
+    Doc.Add('fruit.apple', Items);
+
+    TOML := SerializeTOML(Doc);
+    AssertTrue('Array-of-table header is quoted as one key',
+      Pos('[["fruit.apple"]]', TOML) > 0);
+
+    ParsedDoc := ParseTOML(TOML);
+    try
+      AssertTrue('Quoted array-of-table key exists', ParsedDoc.TryGetValue('fruit.apple', Value));
+      AssertEquals('Quoted array-of-table count matches', 1, Value.AsArray.Count);
+      AssertTrue('Round-tripped item exists',
+        Value.AsArray.Items[0].AsTable.TryGetValue('name', Value));
+      AssertEquals('Round-tripped item name matches', 'apple', Value.AsString);
+    finally
+      ParsedDoc.Free;
+    end;
+  finally
+    Doc.Free;
+  end;
+end;
+
 procedure TTOMLTestCase.Test40_InvalidInteger;
 begin
   try
@@ -714,6 +758,60 @@ begin
   end;
 end;
 
+procedure TTOMLTestCase.Test50_1_UnicodeEscapeSequences;
+var
+  TOML: string;
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+  Expected: string;
+begin
+  TOML := 'escaped = "Snowman: \u2603, clef: \U0001D11E"' + LineEnding;
+  Doc := ParseTOML(TOML);
+  try
+    AssertTrue('Escaped value exists', Doc.TryGetValue('escaped', Value));
+    Expected := 'Snowman: ' + #$E2#$98#$83 + ', clef: ' + #$F0#$9D#$84#$9E;
+    AssertEquals('Unicode escapes are decoded', Expected, Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test50_2_BasicStringAdditionalEscapes;
+var
+  TOML: string;
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  TOML := 'escaped = "a\b\f"' + LineEnding;
+  Doc := ParseTOML(TOML);
+  try
+    AssertTrue('Escaped value exists', Doc.TryGetValue('escaped', Value));
+    AssertEquals('Basic string supports \\b and \\f', 'a' + #8 + #12, Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test50_3_MultilineBasicBackslashTrim;
+var
+  TOML: string;
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  TOML := 'str = """' + LineEnding +
+          'The quick \' + LineEnding +
+          '  brown \' + LineEnding +
+          '  fox"""' + LineEnding;
+  Doc := ParseTOML(TOML);
+  try
+    AssertTrue('Multiline string exists', Doc.TryGetValue('str', Value));
+    AssertEquals('Line-ending backslashes trim newlines and indentation',
+      'The quick brown fox', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
 procedure TTOMLTestCase.Test51_LiteralString;
 var
   TOML: string;
@@ -749,6 +847,25 @@ begin
   end;
 end;
 
+procedure TTOMLTestCase.Test52_1_MultilineLiteralStringSkipsInitialNewline;
+var
+  TOML: string;
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  TOML := 'literal = ''''''' + LineEnding +
+          'alpha' + LineEnding +
+          'beta''''''' + LineEnding;
+  Doc := ParseTOML(TOML);
+  try
+    AssertTrue('Literal value exists', Doc.TryGetValue('literal', Value));
+    AssertEquals('Initial newline is trimmed from multiline literal strings',
+      'alpha' + LineEnding + 'beta', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
 procedure TTOMLTestCase.Test53_IntegerWithUnderscores;
 var
   TOML: string;
@@ -768,6 +885,41 @@ begin
     AssertEquals(12345, Value.AsInteger);
   finally
     Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test53_1_InvalidNumericUnderscores;
+begin
+  try
+    ParseTOML('bad = 1__000');
+    Fail('Double underscores should be rejected');
+  except
+    on E: ETOMLParserException do
+      ;
+  end;
+
+  try
+    ParseTOML('bad = 1000_');
+    Fail('Trailing underscores should be rejected');
+  except
+    on E: ETOMLParserException do
+      ;
+  end;
+
+  try
+    ParseTOML('bad = 1_.5');
+    Fail('Underscores adjacent to decimal points should be rejected');
+  except
+    on E: ETOMLParserException do
+      ;
+  end;
+
+  try
+    ParseTOML('bad = 1e_10');
+    Fail('Underscores adjacent to exponents should be rejected');
+  except
+    on E: ETOMLParserException do
+      ;
   end;
 end;
 
@@ -809,6 +961,17 @@ begin
     AssertEquals(1e10, Value.AsFloat, 0.0);
   finally
     Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test55_1_RejectHexFloat;
+begin
+  try
+    ParseTOML('bad = 0x1.fp3');
+    Fail('Hexadecimal floating-point syntax should be rejected');
+  except
+    on E: ETOMLParserException do
+      ;
   end;
 end;
 
@@ -855,11 +1018,11 @@ var
   Doc: TTOMLTable;
   Value: TTOMLValue;
 begin
-  TOML := 'time = "07:32:00"';
+  TOML := 'time = 07:32:00';
   Doc := ParseTOML(TOML);
   try
     AssertTrue('Time exists', Doc.TryGetValue('time', Value));
-    AssertEquals('07:32:00', Value.AsString);
+    AssertEquals('07:32:00', FormatDateTime('hh:nn:ss', Value.AsDateTime));
   finally
     Doc.Free;
   end;
@@ -1065,6 +1228,29 @@ begin
     
     AssertTrue('Unicode key exists', Doc.TryGetValue('ʎǝʞ', Value));
     AssertEquals('key', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test64_1_DottedQuotedKeysInInlineTable;
+var
+  TOML: string;
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+  InlineTable: TTOMLTable;
+begin
+  TOML := 'site = { "google.com" = true, web."example.org" = false }' + LineEnding;
+  Doc := ParseTOML(TOML);
+  try
+    AssertTrue('Inline table exists', Doc.TryGetValue('site', Value));
+    InlineTable := Value.AsTable;
+
+    AssertTrue('Quoted inline key exists', InlineTable.TryGetValue('google.com', Value));
+    AssertTrue('Quoted inline key value matches', Value.AsBoolean);
+
+    AssertTrue('Dotted quoted inline key exists', InlineTable.TryGetValue('web.example.org', Value));
+    AssertFalse('Dotted quoted inline key value matches', Value.AsBoolean);
   finally
     Doc.Free;
   end;
