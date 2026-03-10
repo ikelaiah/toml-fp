@@ -264,6 +264,11 @@ begin
   end;
 end;
 
+function IsValueTerminator(C: Char): Boolean;
+begin
+  Result := C in [#0, ' ', #9, #10, #13, '#', ',', ']', '}'];
+end;
+
 { TTOMLLexer }
 
 constructor TTOMLLexer.Create(const AInput: string);
@@ -351,6 +356,98 @@ var
   QuoteChar: Char;
   StartColumn: Integer;
   TempValue: string;
+  function HexDigitValue(C: Char): Integer;
+  begin
+    case C of
+      '0'..'9': Result := Ord(C) - Ord('0');
+      'A'..'F': Result := Ord(C) - Ord('A') + 10;
+      'a'..'f': Result := Ord(C) - Ord('a') + 10;
+      else Result := -1;
+    end;
+  end;
+
+  function CodePointToUTF8(CodePoint: Cardinal): string;
+  begin
+    if CodePoint <= $7F then
+      Result := Chr(CodePoint)
+    else if CodePoint <= $7FF then
+      Result := Chr($C0 or (CodePoint shr 6)) +
+        Chr($80 or (CodePoint and $3F))
+    else if CodePoint <= $FFFF then
+      Result := Chr($E0 or (CodePoint shr 12)) +
+        Chr($80 or ((CodePoint shr 6) and $3F)) +
+        Chr($80 or (CodePoint and $3F))
+    else
+      Result := Chr($F0 or (CodePoint shr 18)) +
+        Chr($80 or ((CodePoint shr 12) and $3F)) +
+        Chr($80 or ((CodePoint shr 6) and $3F)) +
+        Chr($80 or (CodePoint and $3F));
+  end;
+
+  function ConsumeUnicodeEscape(DigitCount: Integer): string;
+  var
+    CodePoint: Cardinal;
+    DigitValue: Integer;
+    i: Integer;
+  begin
+    CodePoint := 0;
+    for i := 1 to DigitCount do
+    begin
+      if IsAtEnd then
+        raise ETOMLParserException.Create('Unexpected end of input in Unicode escape');
+
+      DigitValue := HexDigitValue(Peek);
+      if DigitValue < 0 then
+        raise ETOMLParserException.Create('Invalid Unicode escape sequence');
+
+      CodePoint := (CodePoint shl 4) or Cardinal(DigitValue);
+      Advance;
+    end;
+
+    if (CodePoint > $10FFFF) or ((CodePoint >= $D800) and (CodePoint <= $DFFF)) then
+      raise ETOMLParserException.Create('Invalid Unicode code point');
+
+    Result := CodePointToUTF8(CodePoint);
+  end;
+
+  function ConsumeMultilineTrimmedWhitespace: Boolean;
+  var
+    SavePos: Integer;
+    SaveLine: Integer;
+    SaveColumn: Integer;
+    HasNewLine: Boolean;
+  begin
+    SavePos := FPosition;
+    SaveLine := FLine;
+    SaveColumn := FColumn;
+    HasNewLine := False;
+
+    while not IsAtEnd and (Peek in [' ', #9, #10, #13]) do
+    begin
+      if Peek = #13 then
+      begin
+        HasNewLine := True;
+        Advance;
+        if Peek = #10 then
+          Advance;
+      end
+      else
+      begin
+        if Peek = #10 then
+          HasNewLine := True;
+        Advance;
+      end;
+    end;
+
+    if not HasNewLine then
+    begin
+      FPosition := SavePos;
+      FLine := SaveLine;
+      FColumn := SaveColumn;
+    end;
+
+    Result := HasNewLine;
+  end;
 begin
   IsMultiline := False;
   IsLiteral := False;
@@ -365,13 +462,12 @@ begin
     IsMultiline := True;
     Advance; // Skip second quote
     Advance; // Skip third quote
-    if not IsLiteral then
-      // Skip first newline in multiline basic strings
-      if (Peek = #10) or ((Peek = #13) and (PeekNext = #10)) then
-      begin
-        if Peek = #13 then Advance;
-        if Peek = #10 then Advance;
-      end;
+    // Skip the first newline in multiline strings.
+    if (Peek = #10) or ((Peek = #13) and (PeekNext = #10)) then
+    begin
+      if Peek = #13 then Advance;
+      if Peek = #10 then Advance;
+    end;
   end;
   
   TempValue := '';
@@ -398,17 +494,27 @@ begin
       if (not IsLiteral) and (Peek = '\') then
       begin
         Advance; // Skip backslash
+
+        if IsMultiline and ConsumeMultilineTrimmedWhitespace then
+          Continue;
+
         case Peek of
+          'b': TempValue := TempValue + #8;
           'n': TempValue := TempValue + #10;
           't': TempValue := TempValue + #9;
+          'f': TempValue := TempValue + #12;
           'r': TempValue := TempValue + #13;
           '\': TempValue := TempValue + '\';
           '"': TempValue := TempValue + '"';
-          '''': TempValue := TempValue + '''';
-          'u', 'U': begin
-            // Handle Unicode escapes
-            // TODO: Implement Unicode escape sequences
-            raise ETOMLParserException.Create('Unicode escapes not yet implemented');
+          'u': begin
+            Advance;
+            TempValue := TempValue + ConsumeUnicodeEscape(4);
+            Continue;
+          end;
+          'U': begin
+            Advance;
+            TempValue := TempValue + ConsumeUnicodeEscape(8);
+            Continue;
           end;
           else raise ETOMLParserException.Create('Invalid escape sequence');
         end;
@@ -440,22 +546,54 @@ var
   StartColumn: Integer;
   TempValue: string;
   Ch: Char;
-  
+  RawDigits: string;
+
   function IsHexDigit(C: Char): Boolean;
   begin
     Result := IsDigit(C) or (C in ['A'..'F', 'a'..'f']);
   end;
-  
+
   function IsBinDigit(C: Char): Boolean;
   begin
     Result := C in ['0', '1'];
   end;
-  
+
   function IsOctDigit(C: Char): Boolean;
   begin
     Result := C in ['0'..'7'];
   end;
-  
+
+  function ScanDigitSequence(const ValidDigits: TSysCharSet): string;
+  begin
+    Result := '';
+    while not IsAtEnd and ((Peek in ValidDigits) or (Peek = '_')) do
+      Result := Result + Advance;
+  end;
+
+  procedure ValidateUnderscores(const Digits, Context: string);
+  var
+    i: Integer;
+  begin
+    if Digits = '' then
+      raise ETOMLParserException.CreateFmt('Invalid %s: missing digits', [Context]);
+
+    if (Digits[1] = '_') or (Digits[Length(Digits)] = '_') then
+      raise ETOMLParserException.CreateFmt('Invalid %s: misplaced underscore', [Context]);
+
+    for i := 2 to Length(Digits) do
+      if (Digits[i] = '_') and (Digits[i - 1] = '_') then
+        raise ETOMLParserException.CreateFmt('Invalid %s: consecutive underscores', [Context]);
+  end;
+
+  function RemoveUnderscores(const S: string): string;
+  var
+    i: Integer;
+  begin
+    Result := '';
+    for i := 1 to Length(S) do
+      if S[i] <> '_' then
+        Result := Result + S[i];
+  end;
 begin
   IsFloat := False;
   StartColumn := FColumn;
@@ -511,21 +649,19 @@ begin
     begin
       TempValue := TempValue + Advance; // '0'
       TempValue := TempValue + Advance; // 'x', 'o', or 'b'
-      
+
       case Ch of
-        'X': while not IsAtEnd and (IsHexDigit(Peek) or (Peek = '_')) do
-               if Peek <> '_' then TempValue := TempValue + Advance
-               else Advance;
-               
-        'O': while not IsAtEnd and (IsOctDigit(Peek) or (Peek = '_')) do
-               if Peek <> '_' then TempValue := TempValue + Advance
-               else Advance;
-               
-        'B': while not IsAtEnd and (IsBinDigit(Peek) or (Peek = '_')) do
-               if Peek <> '_' then TempValue := TempValue + Advance
-               else Advance;
+        'X': RawDigits := ScanDigitSequence(['0'..'9', 'A'..'F', 'a'..'f']);
+        'O': RawDigits := ScanDigitSequence(['0'..'7']);
+        'B': RawDigits := ScanDigitSequence(['0', '1']);
       end;
-      
+
+      ValidateUnderscores(RawDigits, 'number');
+      TempValue := TempValue + RawDigits;
+
+      if (Ch = 'X') and (Peek in ['.', 'P', 'p']) then
+        raise ETOMLParserException.Create('Hexadecimal floating-point values are not supported by TOML');
+
       Result.TokenType := ttInteger;
       Result.Value := TempValue;
       Result.Line := FLine;
@@ -533,49 +669,46 @@ begin
       Exit;
     end;
   end;
-  
+
   // Scan integer part
-  while not IsAtEnd and (IsDigit(Peek) or (Peek = '_')) do
-    if Peek <> '_' then
-      TempValue := TempValue + Advance
-    else
-      Advance;
-  
+  RawDigits := ScanDigitSequence(['0'..'9']);
+  ValidateUnderscores(RawDigits, 'number');
+  TempValue := TempValue + RawDigits;
+
+  if (Length(RemoveUnderscores(RawDigits)) > 1) and (RemoveUnderscores(RawDigits)[1] = '0') then
+    raise ETOMLParserException.Create('Leading zeros are not allowed in decimal integers');
+
   // Check for decimal point
   if (Peek = '.') and IsDigit(PeekNext) then
   begin
     IsFloat := True;
     TempValue := TempValue + Advance; // Add decimal point
-    
+
     // Scan decimal part
-    while not IsAtEnd and (IsDigit(Peek) or (Peek = '_')) do
-      if Peek <> '_' then
-        TempValue := TempValue + Advance
-      else
-        Advance;
+    RawDigits := ScanDigitSequence(['0'..'9']);
+    ValidateUnderscores(RawDigits, 'float');
+    TempValue := TempValue + RawDigits;
   end;
-  
+
   // Check for exponent
   if Peek in ['e', 'E'] then
   begin
     IsFloat := True;
     TempValue := TempValue + Advance;
-    
+
     if Peek in ['+', '-'] then
       TempValue := TempValue + Advance;
-      
-    while not IsAtEnd and (IsDigit(Peek) or (Peek = '_')) do
-      if Peek <> '_' then
-        TempValue := TempValue + Advance
-      else
-        Advance;
+
+    RawDigits := ScanDigitSequence(['0'..'9']);
+    ValidateUnderscores(RawDigits, 'exponent');
+    TempValue := TempValue + RawDigits;
   end;
-  
+
   if IsFloat then
     Result.TokenType := ttFloat
   else
     Result.TokenType := ttInteger;
-    
+
   Result.Value := TempValue;
   Result.Line := FLine;
   Result.Column := StartColumn;
@@ -599,134 +732,142 @@ end;
 function TTOMLLexer.ScanDateTime: TToken;
 var
   StartColumn: Integer;
-  i: Integer;
   HasTime: Boolean;
-  HasTimezone: Boolean;
   HasDate: Boolean;
   TempValue: string;
-  
-  function ScanDigits(Count: Integer): Boolean;
+  TempPos: Integer;
+
+  function TempChar(Offset: Integer = 0): Char;
+  begin
+    if TempPos + Offset > Length(FInput) then
+      Result := #0
+    else
+      Result := FInput[TempPos + Offset];
+  end;
+
+  function ConsumeDigits(Count: Integer): Boolean;
   var
     i: Integer;
   begin
     Result := True;
     for i := 1 to Count do
     begin
-      if not IsDigit(Peek) then
-      begin
-        Result := False;
-        Exit;
-      end;
-      TempValue := TempValue + Advance;
+      if not (TempChar in ['0'..'9']) then
+        Exit(False);
+      TempValue := TempValue + TempChar;
+      Inc(TempPos);
     end;
   end;
-  
+
+  function ConsumeChar(Expected: Char): Boolean;
+  begin
+    Result := TempChar = Expected;
+    if Result then
+    begin
+      TempValue := TempValue + Expected;
+      Inc(TempPos);
+    end;
+  end;
+
+  function ParseTimePart: Boolean;
+  begin
+    Result := ConsumeDigits(2) and ConsumeChar(':') and
+      ConsumeDigits(2) and ConsumeChar(':') and ConsumeDigits(2);
+    if not Result then
+      Exit;
+
+    if TempChar = '.' then
+    begin
+      TempValue := TempValue + '.';
+      Inc(TempPos);
+      if not (TempChar in ['0'..'9']) then
+        Exit(False);
+      while TempChar in ['0'..'9'] do
+      begin
+        TempValue := TempValue + TempChar;
+        Inc(TempPos);
+      end;
+    end;
+  end;
+
+  function ParseTimezonePart: Boolean;
+  var
+    SavePos: Integer;
+    SaveLen: Integer;
+  begin
+    SavePos := TempPos;
+    SaveLen := Length(TempValue);
+    Result := False;
+    if TempChar = 'Z' then
+    begin
+      TempValue := TempValue + 'Z';
+      Inc(TempPos);
+      Exit(True);
+    end;
+
+    if not (TempChar in ['+', '-']) then
+      Exit(False);
+
+    TempValue := TempValue + TempChar;
+    Inc(TempPos);
+    Result := ConsumeDigits(2) and ConsumeChar(':') and ConsumeDigits(2);
+    if not Result then
+    begin
+      TempPos := SavePos;
+      SetLength(TempValue, SaveLen);
+    end;
+  end;
 begin
   StartColumn := FColumn;
   TempValue := '';
   HasDate := False;
   HasTime := False;
-  HasTimezone := False;
-  
-  // Try to parse as date (YYYY-MM-DD)
-  if ScanDigits(4) and (Peek = '-') then
+
+  TempPos := FPosition;
+
+  if ConsumeDigits(4) and ConsumeChar('-') and ConsumeDigits(2) and
+     ConsumeChar('-') and ConsumeDigits(2) then
   begin
-    TempValue := TempValue + Advance; // -
-    if ScanDigits(2) and (Peek = '-') then
+    HasDate := True;
+
+    if TempChar in ['T', 't', ' '] then
     begin
-      TempValue := TempValue + Advance; // -
-      if ScanDigits(2) then
-        HasDate := True;
-    end;
-  end;
-  
-  // Try to parse time (HH:MM:SS[.fraction])
-  if HasDate and (Peek = 'T') then
-  begin
-    TempValue := TempValue + Advance; // T
-    if ScanDigits(2) and (Peek = ':') then
-    begin
-      TempValue := TempValue + Advance; // :
-      if ScanDigits(2) and (Peek = ':') then
+      TempValue := TempValue + TempChar;
+      Inc(TempPos);
+      HasTime := ParseTimePart;
+      if not HasTime then
       begin
-        TempValue := TempValue + Advance; // :
-        if ScanDigits(2) then
-        begin
-          HasTime := True;
-          
-          // Optional fractional seconds
-          if Peek = '.' then
-          begin
-            TempValue := TempValue + Advance; // .
-            while IsDigit(Peek) do
-              TempValue := TempValue + Advance;
-          end;
-        end;
+        HasDate := False;
+        TempValue := '';
+        TempPos := FPosition;
       end;
     end;
+
+    if HasTime and (TempChar in ['Z', '+', '-']) then
+      ParseTimezonePart;
   end
-  else if not HasDate then
+  else
   begin
-    // Try to parse as time only (HH:MM:SS[.fraction])
-    if ScanDigits(2) and (Peek = ':') then
-    begin
-      TempValue := TempValue + Advance; // :
-      if ScanDigits(2) and (Peek = ':') then
-      begin
-        TempValue := TempValue + Advance; // :
-        if ScanDigits(2) then
-        begin
-          HasTime := True;
-          
-          // Optional fractional seconds
-          if Peek = '.' then
-          begin
-            TempValue := TempValue + Advance; // .
-            while IsDigit(Peek) do
-              TempValue := TempValue + Advance;
-          end;
-        end;
-      end;
-    end;
+    TempValue := '';
+    TempPos := FPosition;
   end;
-  
-  // Try to parse timezone
-  if HasTime and (Peek in ['Z', '+', '-']) then
+
+  if not HasDate then
   begin
-    if Peek = 'Z' then
-    begin
-      TempValue := TempValue + Advance;
-      HasTimezone := True;
-    end
-    else
-    begin
-      TempValue := TempValue + Advance; // + or -
-      if ScanDigits(2) then
-      begin
-        if Peek = ':' then
-        begin
-          TempValue := TempValue + Advance; // :
-          if ScanDigits(2) then
-            HasTimezone := True;
-        end
-        else
-          HasTimezone := True;
-      end;
-    end;
+    TempValue := '';
+    TempPos := FPosition;
+    HasTime := ParseTimePart;
   end;
-  
-  // Determine token type based on what we found
-  if HasDate and HasTime and HasTimezone then
-    Result.TokenType := ttDateTime
-  else if HasDate and HasTime then
-    Result.TokenType := ttDateTime
-  else if HasDate then
-    Result.TokenType := ttDateTime
-  else if HasTime then
-    Result.TokenType := ttDateTime
+
+  if (HasDate or HasTime) and IsValueTerminator(TempChar) then
+  begin
+    while FPosition < TempPos do
+      Advance;
+    Result.TokenType := ttDateTime;
+  end
   else
     Result.TokenType := ttInteger;
-  
+
   Result.Value := TempValue;
   Result.Line := FLine;
   Result.Column := StartColumn;
@@ -1037,8 +1178,6 @@ var
   DateStr: string;
   Year, Month, Day, Hour, Minute, Second: Word;
   MilliSecond: Word;
-  TZHour, TZMinute: Integer;
-  TZNegative: Boolean;
   P: Integer;
   FracStr: string;
   DT: TDateTime;
@@ -1076,9 +1215,10 @@ begin
     end;
     
     // Try to parse time part (HH:MM:SS[.fraction])
-    if (P <= Length(DateStr)) and ((DateStr[P] = 'T') or not HasDate) then
+    if (P <= Length(DateStr)) and (((DateStr[P] = 'T') or (DateStr[P] = ' ')) or not HasDate) then
     begin
-      if DateStr[P] = 'T' then Inc(P);
+      if HasDate and ((DateStr[P] = 'T') or (DateStr[P] = ' ')) then
+        Inc(P);
       
       if (P + 7 <= Length(DateStr)) and (DateStr[P+2] = ':') and (DateStr[P+5] = ':') then
       begin
@@ -1160,7 +1300,6 @@ end;
 function TTOMLParser.ParseArray: TTOMLArray;
 var
   ItemValue: TTOMLValue;
-  HasNewline: Boolean;
 begin
   Result := TTOMLArray.Create;
   try
@@ -1170,22 +1309,15 @@ begin
     begin
       repeat
         // Skip any newlines between array elements
-        HasNewline := False;
         while FCurrentToken.TokenType = ttNewLine do
-        begin
-          HasNewline := True;
           Advance;
-        end;
 
         ItemValue := ParseValue;
         Result.Add(ItemValue);
         
         // Skip any newlines after array elements before comma
         while FCurrentToken.TokenType = ttNewLine do
-        begin
-          HasNewline := True;
           Advance;
-        end
       until not Match(ttComma);
       
       // Skip any newlines before closing bracket

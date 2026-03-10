@@ -83,6 +83,7 @@ type
       @param AKey The key to check
       @returns True if key needs quoting, False otherwise }
     function NeedsQuoting(const AKey: string): Boolean;
+    function FormatKey(const AKey: string): string;
   public
     { Creates a new TOML serializer instance }
     constructor Create;
@@ -207,12 +208,39 @@ begin
   Result := False;
 end;
 
+function TTOMLSerializer.FormatKey(const AKey: string): string;
+var
+  i: Integer;
+  C: Char;
+begin
+  if not NeedsQuoting(AKey) then
+    Exit(AKey);
+
+  Result := '"';
+  for i := 1 to Length(AKey) do
+  begin
+    C := AKey[i];
+    case C of
+      #8:  Result := Result + '\b';
+      #9:  Result := Result + '\t';
+      #10: Result := Result + '\n';
+      #12: Result := Result + '\f';
+      #13: Result := Result + '\r';
+      '"': Result := Result + '\"';
+      '\': Result := Result + '\\';
+      else
+        if C < #32 then
+          Result := Result + Format('\u%.4x', [Ord(C)])
+        else
+          Result := Result + C;
+    end;
+  end;
+  Result := Result + '"';
+end;
+
 procedure TTOMLSerializer.WriteKey(const AKey: string);
 begin
-  if NeedsQuoting(AKey) then
-    WriteString(AKey)
-  else
-    FStringBuilder.Append(AKey);
+  FStringBuilder.Append(FormatKey(AKey));
 end;
 
 procedure TTOMLSerializer.WriteString(const AValue: string);
@@ -323,9 +351,25 @@ var
   i: Integer;
   ArrayValue: TTOMLArray;
   AllTables: Boolean;
-  TablePath: string; 
-  PathComponents: TStringList;
-  Component: string;
+  function BuildPath(const AKey: string): string;
+  var
+    i: Integer;
+  begin
+    Result := '';
+    for i := 0 to FCurrentPath.Count - 1 do
+    begin
+      if Result <> '' then
+        Result := Result + '.';
+      Result := Result + FormatKey(FCurrentPath[i]);
+    end;
+
+    if AKey <> '' then
+    begin
+      if Result <> '' then
+        Result := Result + '.';
+      Result := Result + FormatKey(AKey);
+    end;
+  end;
 begin
   if AInline then
   begin
@@ -389,10 +433,14 @@ begin
           begin
             if i > 0 then
               WriteLine;
-            WriteLine('[[' + Pair.Key + ']]');
-            
-            // Save current indentation level
-            WriteTable(ArrayValue.GetItem(i).AsTable);
+            WriteLine('[[' + BuildPath(Pair.Key) + ']]');
+
+            FCurrentPath.Add(Pair.Key);
+            try
+              WriteTable(ArrayValue.GetItem(i).AsTable);
+            finally
+              FCurrentPath.Delete(FCurrentPath.Count - 1);
+            end;
           end;
           continue;
         end;
@@ -404,46 +452,17 @@ begin
         SubTable := Pair.Value.AsTable;
         
         WriteLine;
-        
-        // Build path components properly
-        PathComponents := TStringList.Create;
-        try
-          // Add all current path components with proper quoting if needed
-          for i := 0 to FCurrentPath.Count - 1 do
-          begin
-            Component := FCurrentPath[i];
-            if NeedsQuoting(Component) then
-              PathComponents.Add('"' + Component + '"')
-            else
-              PathComponents.Add(Component);
-          end;
-          
-          // Add the current key with proper quoting if needed
-          if NeedsQuoting(Pair.Key) then
-            PathComponents.Add('"' + Pair.Key + '"')
-          else
-            PathComponents.Add(Pair.Key);
-          
-          // Join with dots to create the full path
-          TablePath := '';
-          for i := 0 to PathComponents.Count - 1 do
-          begin
-            if i > 0 then
-              TablePath := TablePath + '.';
-            TablePath := TablePath + PathComponents[i];
-          end;
-          
-          WriteLine('[' + TablePath + ']');
-          
-          // Process the subtable recursively if it has items
-          if SubTable.Items.Count > 0 then
-          begin
-            FCurrentPath.Add(Pair.Key);
+
+        WriteLine('[' + BuildPath(Pair.Key) + ']');
+
+        if SubTable.Items.Count > 0 then
+        begin
+          FCurrentPath.Add(Pair.Key);
+          try
             WriteTable(SubTable);
+          finally
             FCurrentPath.Delete(FCurrentPath.Count - 1);
           end;
-        finally
-          PathComponents.Free;
         end;
       end;
     end;

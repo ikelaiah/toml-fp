@@ -15,7 +15,7 @@
         <CustomOptions Value="-FcUTF8"/>
       </Other>
     </CompilerOptions>
-    <Description Value="A robust TOML (Tom&apos;s Obvious, Minimal Language) parser and serializer for Free Pascal, almost fully compliant with the TOML v1.0.0 specification."/>
+    <Description Value="A robust TOML (Tom&apos;s Obvious, Minimal Language) parser and serializer for Free Pascal with broad TOML v1.0.0 support."/>
     <License Value="MIT License
 
 Copyright (c) 2025 ikelaiah
@@ -37,7 +37,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."/>
-    <Version Major="1" Release="3"/>
+    <Version Major="1" Release="4"/>
     <Files>
       <Item>
         <Filename Value="..\..\src\TOML.Parser.pas"/>
