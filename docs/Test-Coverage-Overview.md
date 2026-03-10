@@ -1,6 +1,6 @@
 # Test Coverage Overview
 
-Your test suite comprises 59 tests, categorized as follows:
+Your test suite comprises 70 tests, categorized as follows:
 
 ## Basic Types Tests (Procedures 1-6):
 - String, Integer, Float, Boolean, DateTime values.
@@ -31,10 +31,10 @@ Your test suite comprises 59 tests, categorized as follows:
 - Invalid Table Keys: Validating table key formats.
 
 ## TOML v1.0.0 Specification Tests (Procedures 50-60):
-- Multiline Strings, Literal Strings: Handling different string formats.
+- Multiline Strings, Literal Strings: Handling different string formats, including Unicode escapes, strict basic-string escape validation, and multiline trimming rules.
 - Numerical Formats: Integers with underscores, hexadecimal, octal, binary.
 - Floating Points with Underscores: Ensuring proper parsing.
-- DateTime Variants: Local dates, times, and datetime with offsets.
+- DateTime Variants: Local dates, times, local datetimes with `T` or space separators, and datetime with offsets.
 - Array of Tables, Dotted Table Keys: Advanced table structures.
 
 ## Additional Specification Tests (Procedures 61-72):

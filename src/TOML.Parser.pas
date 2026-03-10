@@ -506,7 +506,6 @@ begin
           'r': TempValue := TempValue + #13;
           '\': TempValue := TempValue + '\';
           '"': TempValue := TempValue + '"';
-          '''': TempValue := TempValue + '''';
           'u': begin
             Advance;
             TempValue := TempValue + ConsumeUnicodeEscape(4);
@@ -1216,9 +1215,10 @@ begin
     end;
     
     // Try to parse time part (HH:MM:SS[.fraction])
-    if (P <= Length(DateStr)) and ((DateStr[P] = 'T') or not HasDate) then
+    if (P <= Length(DateStr)) and (((DateStr[P] = 'T') or (DateStr[P] = ' ')) or not HasDate) then
     begin
-      if DateStr[P] = 'T' then Inc(P);
+      if HasDate and ((DateStr[P] = 'T') or (DateStr[P] = ' ')) then
+        Inc(P);
       
       if (P + 7 <= Length(DateStr)) and (DateStr[P+2] = ':') and (DateStr[P+5] = ':') then
       begin

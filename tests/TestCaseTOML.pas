@@ -60,6 +60,7 @@ type
     procedure Test50_1_UnicodeEscapeSequences;
     procedure Test50_2_BasicStringAdditionalEscapes;
     procedure Test50_3_MultilineBasicBackslashTrim;
+    procedure Test50_4_RejectInvalidBasicStringEscape;
     procedure Test51_LiteralString;
     procedure Test52_MultilineLiteralString;
     procedure Test52_1_MultilineLiteralStringSkipsInitialNewline;
@@ -69,6 +70,7 @@ type
     procedure Test55_FloatWithUnderscores;
     procedure Test55_1_RejectHexFloat;
     procedure Test56_LocalDateTime;
+    procedure Test56_1_SpaceSeparatedLocalDateTime;
     procedure Test57_LocalDate;
     procedure Test58_LocalTime;
     procedure Test59_ArrayOfTables;
@@ -812,6 +814,17 @@ begin
   end;
 end;
 
+procedure TTOMLTestCase.Test50_4_RejectInvalidBasicStringEscape;
+begin
+  try
+    ParseTOML('escaped = "a\''b"');
+    Fail('Invalid basic string escape should be rejected');
+  except
+    on E: ETOMLParserException do
+      ;
+  end;
+end;
+
 procedure TTOMLTestCase.Test51_LiteralString;
 var
   TOML: string;
@@ -991,6 +1004,23 @@ begin
     AssertTrue('Second datetime exists', Doc.TryGetValue('ldt2', Value));
     AssertEquals('1979-05-27T00:32:00.999', 
       FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz', Value.AsDateTime));
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test56_1_SpaceSeparatedLocalDateTime;
+var
+  TOML: string;
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  TOML := 'ldt = 1979-05-27 07:32:00' + LineEnding;
+  Doc := ParseTOML(TOML);
+  try
+    AssertTrue('Space-separated datetime exists', Doc.TryGetValue('ldt', Value));
+    AssertEquals('1979-05-27T07:32:00',
+      FormatDateTime('yyyy-mm-dd"T"hh:nn:ss', Value.AsDateTime));
   finally
     Doc.Free;
   end;

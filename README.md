@@ -6,11 +6,11 @@
 [![TOML](https://img.shields.io/badge/TOML-1.0.0-green.svg)](https://toml.io/)
 [![Version](https://img.shields.io/badge/Version-1.0.4-blueviolet.svg)]()
 
-A robust [TOML (Tom's Obvious, Minimal Language)](https://toml.io/) parser and serializer for Free Pascal with broad TOML v1.0.0 support, including nested tables, arrays of tables, quoted dotted keys, Unicode escapes, and local date/time values.
+A robust [TOML (Tom's Obvious, Minimal Language)](https://toml.io/) parser and serializer for Free Pascal with broad TOML v1.0.0 support, including nested tables, arrays of tables, quoted dotted keys, Unicode escapes, strict basic-string escape handling, and local date/time values.
 
 > [!NOTE] 
 > 
-> Our extensive test suite (68 tests) covers the TOML v1.0.0 behavior implemented by TOML-FP across core data types, structures, serialization, and error cases.
+> Our extensive test suite (70 tests) covers the TOML v1.0.0 behavior implemented by TOML-FP across core data types, structures, serialization, and error cases.
 
 ## Table of Contents
 
@@ -63,7 +63,7 @@ TOML-FP provides a complete solution for working with TOML configuration files i
 - **Error Handling:** Detailed error messages and exception handling
 - **Serialization:** Convert Pascal objects to TOML and back
 - **Documentation:** Comprehensive examples and API documentation
-- **Test Suite:** Comprehensive test suite (68 items)
+- **Test Suite:** Comprehensive test suite (70 items)
 
 ## To Do / In Progress
 
@@ -497,7 +497,7 @@ Serializes a `TTOMLValue` and saves it to the specified file. Returns `True` on 
 
 ## Testing
 
-The library includes a comprehensive test suite (68 items). 
+The library includes a comprehensive test suite (70 items). 
 
 To run the tests:
 
@@ -523,14 +523,14 @@ See [Test-Coverage-Overview.md](docs/Test-Coverage-Overview.md) for details.
 
 ```bash
 $ ./TestRunner.exe -a --format=plain
- Time:00.032 N:68 E:0 F:0 I:0
-  TTOMLTestCase Time:00.032 N:68 E:0 F:0 I:0
+ Time:00.032 N:70 E:0 F:0 I:0
+  TTOMLTestCase Time:00.032 N:70 E:0 F:0 I:0
     Test01_StringValue
     Test02_IntegerValue
     ...
     Test72_LiteralDottedKeyTable
 
-Number of run tests: 68
+Number of run tests: 70
 Number of errors:    0
 Number of failures:  0
 

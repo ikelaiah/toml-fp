@@ -14,9 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added missing basic-string escape support for backspace (`\b`) and form feed (`\f`).
 - Fixed multiline string handling to trim the first newline in multiline literal strings and to honor line-ending backslash whitespace trimming in multiline basic strings.
 - Fixed local time tokenization and parsing for bare TOML time values such as `07:32:00`.
+- Fixed parsing of local datetimes that use a space separator (for example `1979-05-27 07:32:00`) so the time component is preserved.
 - Tightened numeric validation to reject invalid underscore placement, decimal leading zeros, and hexadecimal floating-point syntax.
+- Fixed basic-string escape validation to reject invalid TOML escapes such as `\'`.
 - Fixed serializer output for quoted dotted keys so table headers and arrays of tables preserve literal dotted keys instead of splitting them into paths.
-- Added regression coverage for Unicode escapes, multiline string trimming, local-time parsing, numeric validation, inline quoted dotted keys, and quoted array-of-table serialization.
+- Added regression coverage for Unicode escapes, multiline string trimming, local-time parsing, space-separated local datetimes, numeric validation, invalid basic-string escapes, inline quoted dotted keys, and quoted array-of-table serialization.
 
 ### v1.0.3 - Bug Fixes (2026-02-15)
 
