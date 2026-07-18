@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="220" viewBox="0 0 960 220" role="img" aria-labelledby="title description">
+  <title id="title">TOML-FP</title>
+  <desc id="description">TOML parser and serializer for Free Pascal</desc>
+
+  <rect x="1" y="1" width="958" height="218" rx="24" fill="#0b1220" stroke="#263244" stroke-width="2"/>
+
+  <g aria-label="TOML mark">
+    <rect x="40" y="40" width="140" height="140" rx="24" fill="#111c2e" stroke="#3b82f6" stroke-width="3"/>
+    <path d="M82 76H68v68h14 M138 76h14v68h-14" fill="none" stroke="#93c5fd" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M92 78h36 M110 78v64" fill="none" stroke="#f8fafc" stroke-width="9" stroke-linecap="round"/>
+  </g>
+
+  <text x="224" y="108" fill="#f8fafc" font-family="Inter, Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="1">TOML-FP</text>
+  <rect x="226" y="129" width="72" height="4" rx="2" fill="#3b82f6"/>
+  <text x="224" y="164" fill="#a7b4c6" font-family="Inter, Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="20" font-weight="500" letter-spacing="2.4">TOML FOR FREE PASCAL</text>
+</svg>

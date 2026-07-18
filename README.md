@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/toml-fp-logo.svg" alt="TOML-FP — TOML for Free Pascal" width="760">
+</p>
+
 # TOML Parser for Free Pascal
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
