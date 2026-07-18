@@ -1,48 +1,26 @@
 # Test Coverage Overview
 
-Your test suite comprises 70 tests, categorized as follows:
+TOML-FP v1.0.5 uses two complementary test layers.
 
-## Basic Types Tests (Procedures 1-6):
-- String, Integer, Float, Boolean, DateTime values.
-- Covers basic data types essential for TOML parsing and serialization.
+## Project suite
 
-## Array Tests (Procedures 10-16):
-- Homogeneous Arrays: Integer, String, Boolean arrays.
-- Mixed-Type Arrays: Arrays containing multiple data types.
-- Empty Arrays: Ensuring empty arrays are handled correctly.
-- Arrays with Inline Tables: Testing the parsing and serialization of arrays containing inline tables with newlines.
+The FPCUnit project contains 75 tests covering:
 
-## Table Tests (Procedures 20-25):
-- Basic Tables: Single-level tables with different data types.
-- Inline Tables: Compact table definitions.
-- Empty Tables: Handling tables without any key-value pairs.
-- Nested Tables: Tables within tables for hierarchical data.
+- scalar values, arrays, inline tables, tables, and arrays of tables;
+- parsing and serialization, including hierarchical and literal dotted keys;
+- Unicode escapes, multiline strings, numeric formats, and all four TOML date/time kinds;
+- invalid syntax, duplicate keys, strict lexical rules, and parse-error ownership;
+- v1.0.5 regressions for trailing commas, nested dotted key-values, date/time offset preservation, and clean Debug/Release builds.
 
-## Serialization Tests (Procedures 30-37):
-- Type-Specific Serialization: Ensures each data type serializes correctly.
-- Table Serialization: Handling nested and complex table structures.
-- Hierarchical Table Paths vs Literal Dotted Keys: Proper distinction between `[server.database]` (hierarchical) and `["server.database"]` (literal dotted key).
-- Serialization Accuracy: Verifying the output matches expected TOML strings.
-- Array of Tables Serialization: Ensuring arrays of tables are properly serialized using the [[table]] format.
+The Debug build runs with `heaptrc`; the release gate requires 75 tests, zero errors, zero failures, and zero unfreed blocks. The v1.0.5 local gate used Lazarus 4.8 and FPC 3.2.2.
 
-## Error Cases (Procedures 40-44):
-- Invalid Data Types: Testing parser's response to incorrect data types.
-- Duplicate Keys: Ensuring duplicate keys are handled as per spec.
-- Invalid Table Keys: Validating table key formats.
+## Official conformance suite
 
-## TOML v1.0.0 Specification Tests (Procedures 50-60):
-- Multiline Strings, Literal Strings: Handling different string formats, including Unicode escapes, strict basic-string escape validation, and multiline trimming rules.
-- Numerical Formats: Integers with underscores, hexadecimal, octal, binary.
-- Floating Points with Underscores: Ensuring proper parsing.
-- DateTime Variants: Local dates, times, local datetimes with `T` or space separators, and datetime with offsets.
-- Array of Tables, Dotted Table Keys: Advanced table structures.
+CI pins [`toml-test`](https://github.com/toml-lang/toml-test) v2.2.0 to the TOML 1.0 profile through `tests/conformance/TOMLTestDecoder.lpr`.
 
-## Additional Specification Tests (Procedures 61-72):
-- Infinity and NaN Handling: Parsing special floating-point values.
-- Offset DateTimes: Timezone-aware datetime parsing.
-- Quoted Keys, Whitespace Handling: Ensuring flexibility in key definitions and parsing.
-- Array Type Validation: Ensuring array types conform to TOML spec.
-- Table Array Nesting: Testing nested array of tables structures.
-- Complex Keys: Handling complex key expressions.
-- Hierarchical Nested Tables: Correctly serializing nested table hierarchies (Test71).
-- Literal Dotted Keys: Properly quoting keys containing dots (Test72).
+- Valid decoder cases: 184 of 205 pass.
+- Invalid decoder cases: 431 of 474 are rejected.
+- Known gaps: 64 named exclusions guarded by `-skip-must-err`.
+- Encoder cases: not yet covered.
+
+See [`tests/conformance/README.md`](../tests/conformance/README.md) for build and run instructions. The measured figures are deliberately more precise than a blanket “fully compliant” claim.

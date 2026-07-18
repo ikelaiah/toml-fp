@@ -34,6 +34,14 @@ type
     tvtInlineTable  // Inline table value type (compact table representation)
   );
 
+  { Distinguishes the four date/time types defined by TOML 1.0. }
+  TTOMLDateTimeKind = (
+    tdtOffsetDateTime,
+    tdtLocalDateTime,
+    tdtLocalDate,
+    tdtLocalTime
+  );
+
   { Forward declarations for interdependent types }
   TTOMLValue = class;
   TTOMLArray = class;
@@ -148,13 +156,19 @@ type
   TTOMLDateTime = class(TTOMLValue)
   private
     FValue: TDateTime;  // The datetime value
+    FKind: TTOMLDateTimeKind;
+    FRawValue: string;
   protected
     function GetAsDateTime: TDateTime; override;
   public
     { Creates a new TOML datetime value
       @param AValue The TDateTime value to store }
-    constructor Create(const AValue: TDateTime);
+    constructor Create(const AValue: TDateTime); overload;
+    constructor Create(const AValue: TDateTime;
+      const AKind: TTOMLDateTimeKind; const ARawValue: string); overload;
     property Value: TDateTime read FValue write FValue;
+    property Kind: TTOMLDateTimeKind read FKind;
+    property RawValue: string read FRawValue;
   end;
 
   { Array value - represents a TOML array (ordered list of values) }
@@ -336,6 +350,17 @@ constructor TTOMLDateTime.Create(const AValue: TDateTime);
 begin
   inherited Create(tvtDateTime);
   FValue := AValue;
+  FKind := tdtOffsetDateTime;
+  FRawValue := '';
+end;
+
+constructor TTOMLDateTime.Create(const AValue: TDateTime;
+  const AKind: TTOMLDateTimeKind; const ARawValue: string);
+begin
+  inherited Create(tvtDateTime);
+  FValue := AValue;
+  FKind := AKind;
+  FRawValue := ARawValue;
 end;
 
 function TTOMLDateTime.GetAsDateTime: TDateTime;
@@ -425,4 +450,4 @@ begin
   Result := Self;
 end;
 
-end. 
+end.

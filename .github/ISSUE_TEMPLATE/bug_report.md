@@ -33,7 +33,7 @@ Error details here
 ## Environment
 - OS: <!-- e.g., Windows 10, Ubuntu 22.04 -->
 - Free Pascal Version: <!-- e.g., 3.2.2 -->
-- Lazarus Version (if applicable): <!-- e.g., 3.6 -->
+- Lazarus Version (if applicable): <!-- minimum supported: 4.8 -->
 - TOML-FP Version: <!-- e.g., 1.0.0 -->
 
 ## Additional Context

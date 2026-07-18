@@ -93,6 +93,11 @@ type
     procedure Test70_ComplexKeys;
     procedure Test71_HierarchicalNestedTable;
     procedure Test72_LiteralDottedKeyTable;
+    procedure Test73_ArrayTrailingComma;
+    procedure Test74_DateTimeKindsAndRawValues;
+    procedure Test75_DottedKeysCreateNestedTables;
+    procedure Test76_StrictLexicalRejections;
+    procedure Test77_DateTimeSerializationPreservesOffset;
   end;
 
 implementation
@@ -1268,7 +1273,7 @@ var
   TOML: string;
   Doc: TTOMLTable;
   Value: TTOMLValue;
-  InlineTable: TTOMLTable;
+  InlineTable, WebTable: TTOMLTable;
 begin
   TOML := 'site = { "google.com" = true, web."example.org" = false }' + LineEnding;
   Doc := ParseTOML(TOML);
@@ -1279,7 +1284,9 @@ begin
     AssertTrue('Quoted inline key exists', InlineTable.TryGetValue('google.com', Value));
     AssertTrue('Quoted inline key value matches', Value.AsBoolean);
 
-    AssertTrue('Dotted quoted inline key exists', InlineTable.TryGetValue('web.example.org', Value));
+    AssertTrue('Dotted inline table exists', InlineTable.TryGetValue('web', Value));
+    WebTable := Value.AsTable;
+    AssertTrue('Quoted component remains literal', WebTable.TryGetValue('example.org', Value));
     AssertFalse('Dotted quoted inline key value matches', Value.AsBoolean);
   finally
     Doc.Free;
@@ -1417,14 +1424,15 @@ end;
 procedure TTOMLTestCase.Test68_KeyValidation;
 var
   Data: TTOMLTable;
-  Value: TTOMLValue;
+  Value, SubValue: TTOMLValue;
 begin
   // Test 1: Valid Dotted Key
   try
     Data := ParseTOML('valid.key = "value"');
     try
-      AssertTrue('valid.key exists', Data.TryGetValue('valid.key', Value));
-      AssertEquals('valid.key value', 'value', Value.AsString);
+      AssertTrue('valid table exists', Data.TryGetValue('valid', Value));
+      AssertTrue('valid.key exists', Value.AsTable.TryGetValue('key', SubValue));
+      AssertEquals('valid.key value', 'value', SubValue.AsString);
     finally
       Data.Free;
     end;
@@ -1437,9 +1445,10 @@ begin
   try
     Data := ParseTOML('valid."dotted.key" = "value"');
     try
-      // Corrected assertion to look for 'valid.dotted.key'
-      AssertTrue('"valid.dotted.key" exists', Data.TryGetValue('valid.dotted.key', Value));
-      AssertEquals('"valid.dotted.key" value', 'value', Value.AsString);
+      AssertTrue('valid table exists', Data.TryGetValue('valid', Value));
+      AssertTrue('Quoted dotted component exists',
+        Value.AsTable.TryGetValue('dotted.key', SubValue));
+      AssertEquals('Quoted dotted component value', 'value', SubValue.AsString);
     finally
       Data.Free;
     end;
@@ -1722,6 +1731,126 @@ begin
     finally
       ParsedDoc.Free;
     end;
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test73_ArrayTrailingComma;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML('values = [1, 2,]');
+  try
+    AssertTrue('Array exists', Doc.TryGetValue('values', Value));
+    AssertEquals('Trailing comma does not add an item', 2, Value.AsArray.Count);
+    AssertEquals('First item', 1, Value.AsArray.Items[0].AsInteger);
+    AssertEquals('Second item', 2, Value.AsArray.Items[1].AsInteger);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test74_DateTimeKindsAndRawValues;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(
+    'offset = 1979-05-27T07:32:00-07:30' + LineEnding +
+    'local_datetime = 1979-05-27 07:32:00' + LineEnding +
+    'local_date = 1979-05-27' + LineEnding +
+    'local_time = 07:32:00');
+  try
+    AssertTrue('Offset datetime exists', Doc.TryGetValue('offset', Value));
+    AssertEquals('Offset datetime kind', Ord(tdtOffsetDateTime),
+      Ord(TTOMLDateTime(Value).Kind));
+    AssertEquals('Offset datetime raw value', '1979-05-27T07:32:00-07:30',
+      TTOMLDateTime(Value).RawValue);
+
+    AssertTrue('Local datetime exists', Doc.TryGetValue('local_datetime', Value));
+    AssertEquals('Local datetime kind', Ord(tdtLocalDateTime),
+      Ord(TTOMLDateTime(Value).Kind));
+
+    AssertTrue('Local date exists', Doc.TryGetValue('local_date', Value));
+    AssertEquals('Local date kind', Ord(tdtLocalDate),
+      Ord(TTOMLDateTime(Value).Kind));
+
+    AssertTrue('Local time exists', Doc.TryGetValue('local_time', Value));
+    AssertEquals('Local time kind', Ord(tdtLocalTime),
+      Ord(TTOMLDateTime(Value).Kind));
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test75_DottedKeysCreateNestedTables;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(
+    'fruit.apple.color = "red"' + LineEnding +
+    'fruit."apple.type".name = "gala"');
+  try
+    AssertTrue('Fruit table exists', Doc.TryGetValue('fruit', Value));
+    AssertTrue('Apple table exists', Value.AsTable.TryGetValue('apple', Value));
+    AssertTrue('Color exists', Value.AsTable.TryGetValue('color', Value));
+    AssertEquals('Color value', 'red', Value.AsString);
+
+    AssertTrue('Fruit table still exists', Doc.TryGetValue('fruit', Value));
+    AssertTrue('Quoted component remains literal',
+      Value.AsTable.TryGetValue('apple.type', Value));
+    AssertTrue('Name exists', Value.AsTable.TryGetValue('name', Value));
+    AssertEquals('Name value', 'gala', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test76_StrictLexicalRejections;
+const
+  InvalidDocuments: array[0..4] of string = (
+    'key = TRUE',
+    'key = +0x1',
+    'key = 0X1',
+    'key = "unterminated',
+    'key = true' + #13 + 'next = false'
+  );
+var
+  I: Integer;
+  Doc: TTOMLTable;
+begin
+  for I := Low(InvalidDocuments) to High(InvalidDocuments) do
+  begin
+    Doc := nil;
+    try
+      Doc := ParseTOML(InvalidDocuments[I]);
+      Doc.Free;
+      Doc := nil;
+      Fail('Invalid TOML was accepted: ' + InvalidDocuments[I]);
+    except
+      on E: ETOMLParserException do
+        Doc.Free;
+    end;
+  end;
+end;
+
+procedure TTOMLTestCase.Test77_DateTimeSerializationPreservesOffset;
+var
+  Doc: TTOMLTable;
+  Serialized: string;
+begin
+  Doc := ParseTOML(
+    'offset = 1979-05-27t07:32:00-07:30' + LineEnding +
+    'utc = 1979-05-27t07:32:00z');
+  try
+    Serialized := SerializeTOML(Doc);
+    AssertTrue('Numeric offset is preserved',
+      Pos('offset = 1979-05-27T07:32:00-07:30', Serialized) > 0);
+    AssertTrue('Lowercase datetime markers are normalized',
+      Pos('utc = 1979-05-27T07:32:00Z', Serialized) > 0);
   finally
     Doc.Free;
   end;

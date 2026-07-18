@@ -13,7 +13,7 @@ Thank you for your interest in contributing to TOML-FP! This document provides g
 ## Development Setup
 
 1. Install Free Pascal Compiler 3.2.2 or later
-2. Install Lazarus IDE 3.6 (optional)
+2. Install Lazarus IDE 4.8 or later (required for the Lazarus project builds)
 3. Clone the repository
 4. Run the test suite to ensure everything works
 
@@ -21,6 +21,8 @@ Thank you for your interest in contributing to TOML-FP! This document provides g
 
 - Add tests for new features
 - Ensure all tests pass before submitting PR
+- Run both clean build modes: `lazbuild --build-all --build-mode=Debug tests/TestRunner.lpi` and `lazbuild --build-all --build-mode=Release tests/TestRunner.lpi`
+- For parser changes, run the pinned conformance gate described in `tests/conformance/README.md`
 
 
 ## Pull Request Process
