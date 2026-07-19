@@ -1,8 +1,6 @@
-# TOML 1.0 valid cases not yet supported (21)
+# TOML 1.0 valid cases not yet supported (19)
 valid/comment/everywhere
 valid/datetime/leap-year
-valid/float/long
-valid/float/max-int
 valid/integer/long
 valid/key/alphanum
 valid/key/like-date

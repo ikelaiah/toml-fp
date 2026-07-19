@@ -47,7 +47,14 @@ jobs:
         shell: pwsh
         run: |
           $installer = Join-Path $env:RUNNER_TEMP 'lazarus-4.8-fpc-3.2.2-win64.exe'
-          Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/lazarus/Lazarus%20Windows%2064%20bits/Lazarus%204.8/lazarus-4.8-fpc-3.2.2-win64.exe' -OutFile $installer
+          $downloadUri = 'https://download.lazarus-ide.org/Lazarus%20Windows%2064%20bits/Lazarus%204.8/lazarus-4.8-fpc-3.2.2-win64.exe'
+          Invoke-WebRequest -Uri $downloadUri -OutFile $installer
+
+          $header = @(Get-Content -LiteralPath $installer -AsByteStream -TotalCount 2)
+          if ($header.Count -ne 2 -or $header[0] -ne 0x4D -or $header[1] -ne 0x5A) {
+            throw 'Lazarus download is not a Windows executable'
+          }
+
           $actualHash = (Get-FileHash -Algorithm SHA256 $installer).Hash
           $expectedHash = 'ED25EE171D55E23CF14E0633159FDD2325EFBA56E186F8AB817AD3BF97D267D7'
           if ($actualHash -ne $expectedHash) {

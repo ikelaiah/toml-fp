@@ -9,7 +9,7 @@ That means all currently supported official cases are required to keep passing,
 and CI also fails when a listed case starts passing until its stale exclusion is
 removed. The v1.0.5 baseline is:
 
-- 184 of 205 valid decoder cases pass.
+- 186 of 205 valid decoder cases pass.
 - 431 of 474 invalid decoder cases are rejected.
 - Encoder conformance is not yet covered.
 
