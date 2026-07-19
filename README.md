@@ -67,7 +67,7 @@ TOML-FP provides a complete solution for working with TOML configuration files i
 - **Memory Management:** Automatic cleanup with proper object lifecycle management
 - **Error Handling:** Detailed error messages and exception handling
 - **Serialization:** Convert Pascal objects to TOML and back
-- **Documentation:** Comprehensive examples and API documentation
+- **Documentation:** Practical examples and API documentation
 - **Test Suite:** 82 project tests plus the official `toml-test` decoder suite
 
 ## To Do / In Progress
@@ -540,14 +540,14 @@ See [Test-Coverage-Overview.md](docs/Test-Coverage-Overview.md) for details.
 
 ```bash
 $ ./TestRunner --all --format=plain
- Time:00.032 N:75 E:0 F:0 I:0
-  TTOMLTestCase Time:00.032 N:75 E:0 F:0 I:0
+ Time:00.032 N:82 E:0 F:0 I:0
+  TTOMLTestCase Time:00.032 N:82 E:0 F:0 I:0
     Test01_StringValue
     Test02_IntegerValue
     ...
-    Test77_DateTimeSerializationPreservesOffset
+    Test84_KeySerializationRoundTrip
 
-Number of run tests: 75
+Number of run tests: 82
 Number of errors:    0
 Number of failures:  0
 ``` 
@@ -558,7 +558,7 @@ Check out the `examples` directory and the test cases, `tests/TestCaseTOML.pas`,
 
 - Basic Configuration Reading
 - Writing Complex Data Structures
-- Error Handling Patterns
+- Parser error cases in the test suite
 - Integration Examples
 
 ## Contributing
