@@ -33,7 +33,8 @@ end;
 
 function FloatValueToString(const AValue: Double): string;
 var
-  FormatSettings: TFormatSettings;
+  Decimal: TFloatRec;
+  Digits: string;
 begin
   if IsNan(AValue) then
     Exit('nan');
@@ -47,11 +48,18 @@ begin
   if (AValue = 0.0) and (PInt64(@AValue)^ < 0) then
     Exit('-0.0');
 
-  FormatSettings := DefaultFormatSettings;
-  FormatSettings.DecimalSeparator := '.';
-  Result := Format('%.17g', [AValue], FormatSettings);
-  if (Pos('.', Result) = 0) and (Pos('E', UpperCase(Result)) = 0) then
-    Result := Result + '.0';
+  FloatToDecimal(Decimal, AValue, fvDouble, 17, 9999);
+  Digits := StrPas(@Decimal.Digits[0]);
+  if Digits = '' then
+    Exit('0.0');
+
+  Result := '';
+  if Decimal.Negative then
+    Result := '-';
+  Result := Result + Digits[1];
+  if Length(Digits) > 1 then
+    Result := Result + '.' + Copy(Digits, 2, MaxInt);
+  Result := Result + 'e' + IntToStr(Decimal.Exponent - 1);
 end;
 
 function DateTimeValueToString(const AValue: TTOMLDateTime): string;

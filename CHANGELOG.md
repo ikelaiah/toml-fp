@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+### v1.0.6 - Key Grammar and Parser Hardening (2026-07-21)
+
+- Added context-aware key tokenization so numeric, date-like, leading-zero, and dash-prefixed bare keys no longer inherit value-number validation rules.
+- Fixed numeric dotted keys and numeric table-name components so each dot creates the required nested table path.
+- Rejected multiline basic and literal strings in keys and table headers.
+- Rejected table headers and key-value pairs followed by additional same-line content without a TOML line boundary.
+- Made conformance-adapter float output deterministic across Linux and Windows at full `Double` precision.
+- Expanded the project suite from 75 to 82 tests with key grammar, rejection, and serialization round-trip coverage.
+- Improved the pinned TOML 1.0 decoder baseline to 199/205 valid cases and 445/474 invalid cases, leaving 35 guarded gaps.
+- Avoided duplicate branch push and pull-request CI runs, added stale-run cancellation, and added explicit job timeouts.
+- Synchronized package, README, coverage, conformance, checklist, and release-note metadata at version 1.0.6.
+
+
 ### v1.0.5 - Conformance and Release Reliability (2026-07-19)
 
 - Fixed clean Release builds by adding the source directory to the Release and global Lazarus project search paths.

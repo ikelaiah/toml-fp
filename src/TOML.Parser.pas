@@ -64,6 +64,7 @@ type
     FPosition: Integer;  // Current position in input
     FLine: Integer;      // Current line number (1-based)
     FColumn: Integer;    // Current column number (1-based)
+    FKeyMode: Boolean;   // Whether the next token is part of a key
     
     { Checks if we've reached the end of input
       @returns True if at end, False otherwise }
@@ -97,6 +98,9 @@ type
     { Scans an identifier token
       @returns The scanned identifier token }
     function ScanIdentifier: TToken;
+
+    { Scans a bare key without applying value-number or datetime rules }
+    function ScanBareKey: TToken;
     
     { Scans a datetime token
       @returns The scanned datetime token
@@ -128,6 +132,9 @@ type
       @returns The next token
       @raises ETOMLParserException if invalid input encountered }
     function NextToken: TToken;
+
+    { Selects TOML key tokenization for the next token. }
+    property KeyMode: Boolean read FKeyMode write FKeyMode;
   end;
 
   { Parser class that performs syntactic analysis of TOML input
@@ -282,6 +289,7 @@ begin
   FPosition := 1;
   FLine := 1;
   FColumn := 1;
+  FKeyMode := False;
 end;
 
 function TTOMLLexer.IsAtEnd: Boolean;
@@ -760,6 +768,25 @@ begin
   Result.Column := StartColumn;
 end;
 
+function TTOMLLexer.ScanBareKey: TToken;
+var
+  StartColumn: Integer;
+begin
+  StartColumn := FColumn;
+  Result.Value := '';
+
+  while not IsAtEnd and (IsAlphaNumeric(Peek) or (Peek = '-')) do
+    Result.Value := Result.Value + Advance;
+
+  if Result.Value = '' then
+    raise ETOMLParserException.CreateFmt(
+      'Invalid bare key at line %d, column %d', [FLine, StartColumn]);
+
+  Result.TokenType := ttIdentifier;
+  Result.Line := FLine;
+  Result.Column := StartColumn;
+end;
+
 function TTOMLLexer.ScanDateTime: TToken;
 var
   StartColumn: Integer;
@@ -969,40 +996,67 @@ begin
       Result.TokenType := ttNewLine;
       Result.Value := #10;
     end;
-    '"', '''': Result := ScanString;
-    '0'..'9': begin
-      // Save current position
-      SavePos := FPosition;
-      SaveLine := FLine;
-      SaveCol := FColumn;
-      
-      // Try to scan as DateTime first
-      Result := ScanDateTime;
-      
-      // If not a DateTime, restore position and try as number
-      if Result.TokenType <> ttDateTime then
+    '"', '''':
       begin
-        FPosition := SavePos;
-        FLine := SaveLine;
-        FColumn := SaveCol;
-        Result := ScanNumber;
+        if FKeyMode and (PeekNext = Peek) and
+           (FPosition + 2 <= Length(FInput)) and
+           (FInput[FPosition + 2] = Peek) then
+          raise ETOMLParserException.CreateFmt(
+            'Multiline strings are not allowed in keys at line %d, column %d',
+            [FLine, FColumn]);
+        Result := ScanString;
       end;
-    end;
-    '+', '-': Result := ScanNumber;
-    else
-      if IsAlpha(Peek) then
+    '0'..'9': begin
+      if FKeyMode then
+        Result := ScanBareKey
+      else
       begin
         // Save current position
         SavePos := FPosition;
         SaveLine := FLine;
         SaveCol := FColumn;
-        
-        Result := ScanIdentifier;
-        
-        // Check if it's a special float value
-        if (Result.Value = 'inf') or (Result.Value = 'nan') then
+
+        // Try to scan as DateTime first
+        Result := ScanDateTime;
+
+        // If not a DateTime, restore position and try as number
+        if Result.TokenType <> ttDateTime then
         begin
-          Result.TokenType := ttFloat;
+          FPosition := SavePos;
+          FLine := SaveLine;
+          FColumn := SaveCol;
+          Result := ScanNumber;
+        end;
+      end;
+    end;
+    '+', '-':
+      if FKeyMode then
+      begin
+        if Peek <> '-' then
+          raise ETOMLParserException.CreateFmt(
+            'Unexpected character in bare key: %s at line %d, column %d',
+            [Peek, FLine, FColumn]);
+        Result := ScanBareKey;
+      end
+      else
+        Result := ScanNumber;
+    else
+      if IsAlpha(Peek) then
+      begin
+        if FKeyMode then
+          Result := ScanBareKey
+        else
+        begin
+          // Save current position
+          SavePos := FPosition;
+          SaveLine := FLine;
+          SaveCol := FColumn;
+
+          Result := ScanIdentifier;
+
+          // Check if it's a special float value
+          if (Result.Value = 'inf') or (Result.Value = 'nan') then
+            Result.TokenType := ttFloat;
         end;
       end
       else
@@ -1020,6 +1074,7 @@ constructor TTOMLParser.Create(const AInput: string);
 begin
   inherited Create;
   FLexer := TTOMLLexer.Create(AInput);
+  FLexer.KeyMode := True;
   FHasPeeked := False;
   Advance;
 end;
@@ -1414,6 +1469,7 @@ var
 begin
   Result := TTOMLTable.Create;
   try
+    FLexer.KeyMode := True;
     Expect(ttLBrace);
     
     if FCurrentToken.TokenType <> ttRBrace then
@@ -1426,9 +1482,11 @@ begin
           KeyPair.Value.Free;
           raise;
         end;
+        FLexer.KeyMode := True;
       until not Match(ttComma);
     end;
-    
+
+    FLexer.KeyMode := False;
     Expect(ttRBrace);
   except
     Result.Free;
@@ -1470,6 +1528,7 @@ begin
       Key := Key + IntToStr(Length(Result.Key)) + ':' + Result.Key;
     end;
       
+    FLexer.KeyMode := False;
     Expect(ttEqual);
     Value := ParseValue;
     Result := TTOMLKeyValuePair.Create(Key, Value);
@@ -1561,9 +1620,15 @@ begin
               TablePath.Add(ParseKey);
             until not Match(ttDot);
             
+            FLexer.KeyMode := False;
             Expect(ttRBracket);
             if IsArrayOfTables then
               Expect(ttRBracket);
+
+            if not (FCurrentToken.TokenType in [ttNewLine, ttEOF]) then
+              raise ETOMLParserException.CreateFmt(
+                'Table header must end at line %d, column %d',
+                [FCurrentToken.Line, FCurrentToken.Column]);
             
             // Navigate to the correct table
             CurrentTable := Result;
@@ -1652,9 +1717,18 @@ begin
                 raise ETOMLParserException.CreateFmt('Error adding key-value pair: %s at line %d, column %d',
                   [E.Message, FCurrentToken.Line, FCurrentToken.Column]);
             end;
+
+            if not (FCurrentToken.TokenType in [ttNewLine, ttEOF]) then
+              raise ETOMLParserException.CreateFmt(
+                'Key-value pair must end at line %d, column %d',
+                [FCurrentToken.Line, FCurrentToken.Column]);
           end;
-          
-          ttNewLine: Advance;
+
+          ttNewLine:
+          begin
+            FLexer.KeyMode := True;
+            Advance;
+          end;
           
           else
             raise ETOMLParserException.CreateFmt('Unexpected token type: %s at line %d, column %d',

@@ -1,25 +1,12 @@
-# TOML 1.0 valid cases not yet supported (19)
+# TOML 1.0 valid cases not yet supported (6)
 valid/comment/everywhere
-valid/datetime/leap-year
 valid/integer/long
-valid/key/alphanum
-valid/key/like-date
-valid/key/numeric-02
-valid/key/numeric-03
-valid/key/numeric-04
-valid/key/numeric-05
-valid/key/numeric-07
-valid/key/numeric-08
-valid/key/start
-valid/spec-1.0.0/keys-7
 valid/spec-1.0.0/string-4
 valid/spec-1.0.0/string-7
 valid/string/multiline-quotes
 valid/string/raw-multiline
-valid/table/names
-valid/table/names-with-values
 
-# TOML 1.0 invalid cases not yet rejected (43)
+# TOML 1.0 invalid cases not yet rejected (29)
 invalid/array/extending-table
 invalid/array/tables-01
 invalid/encoding/bad-codepoint
@@ -32,18 +19,6 @@ invalid/inline-table/duplicate-key-03
 invalid/inline-table/overwrite-02
 invalid/inline-table/overwrite-05
 invalid/inline-table/overwrite-08
-invalid/key/after-array
-invalid/key/after-table
-invalid/key/after-value
-invalid/key/multiline-key-01
-invalid/key/multiline-key-02
-invalid/key/multiline-key-03
-invalid/key/multiline-key-04
-invalid/key/newline-04
-invalid/key/newline-05
-invalid/key/no-eol-01
-invalid/key/no-eol-02
-invalid/key/no-eol-06
 invalid/spec-1.0.0/inline-table-2-0
 invalid/spec-1.0.0/table-9-0
 invalid/spec-1.0.0/table-9-1
@@ -57,8 +32,6 @@ invalid/table/duplicate-key-05
 invalid/table/duplicate-key-07
 invalid/table/duplicate-key-09
 invalid/table/llbrace
-invalid/table/multiline-key-01
-invalid/table/multiline-key-02
 invalid/table/redefine-02
 invalid/table/redefine-03
 invalid/table/rrbrace
