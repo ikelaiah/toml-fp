@@ -6,7 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Changelog
+### v1.0.5 - Conformance and Release Reliability (2026-07-18)
+
+- Fixed clean Release builds by adding the source directory to the Release and global Lazarus project search paths.
+- Added Linux and Windows CI for clean package, Debug-test, and Release-test builds with Lazarus 4.8 and FPC 3.2.2.
+- Added a pinned `toml-test` v2.2.0 decoder adapter and regression gate. The v1.0.5 baseline passes 186/205 valid cases and rejects 431/474 invalid cases; the 62 remaining gaps are tracked explicitly.
+- Fixed dotted key-value parsing so syntactic dotted keys create nested tables while quoted dotted components stay literal.
+- Added array trailing-comma support.
+- Preserved TOML date/time kinds and original offset syntax for correct serialization, including lowercase `t` and `z` input.
+- Tightened lexical validation for unterminated and single-line strings, unescaped control characters, bare carriage returns, case-sensitive booleans, and base-prefixed integers.
+- Fixed value ownership when tokenization fails after a parsed scalar, eliminating a parse-error memory leak.
+- Expanded the project test suite from 70 to 75 tests and retained zero-error, zero-failure, zero-leak Debug results.
+- Synchronized package, README, contribution, coverage, and release-note metadata at version 1.0.5.
 
 ### v1.0.4 - Bug Fixes (2026-03-09)
 
@@ -43,18 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added additional test cases to verify these fixes.
 
 
-## [1.1.0] - 2025-01-02
-
-### Added
-- Added Lazarus package
-- Updated LICENSE.md
-- Updated README.md
-
 ## [1.0.0] - 2025-01-01
 
 ### Added
 - Initial release
-- _Almost_ fully compliant to TOML v1.0.0 specification (covering all essential data types, structures, and edge cases.)
+- Broad TOML v1.0.0 support across essential data types and structures
 - Parsing and serialization functionality
 - Comprehensive test suite (53 items)
 - Documentation and examples
+- Lazarus package
+- Updated license and README metadata

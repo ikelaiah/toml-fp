@@ -77,7 +77,7 @@ type
     { Writes a TOML datetime value
       @param ADateTime The datetime to write
       Formats datetime according to RFC 3339 }
-    procedure WriteDateTime(const ADateTime: TDateTime);
+    procedure WriteDateTime(const ADateTime: TTOMLDateTime);
     
     { Checks if a key needs to be quoted
       @param AKey The key to check
@@ -270,10 +270,31 @@ begin
   FStringBuilder.Append('"');
 end;
 
-procedure TTOMLSerializer.WriteDateTime(const ADateTime: TDateTime);
+procedure TTOMLSerializer.WriteDateTime(const ADateTime: TTOMLDateTime);
+var
+  Text: string;
 begin
-  // Format as RFC 3339 UTC datetime
-  FStringBuilder.Append(FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz"Z"', ADateTime));
+  if ADateTime.RawValue <> '' then
+  begin
+    Text := ADateTime.RawValue;
+    if (Length(Text) >= 11) and (Text[11] in [' ', 't']) then
+      Text[11] := 'T';
+    if (Text <> '') and (Text[Length(Text)] = 'z') then
+      Text[Length(Text)] := 'Z';
+    FStringBuilder.Append(Text);
+    Exit;
+  end;
+
+  case ADateTime.Kind of
+    tdtOffsetDateTime:
+      FStringBuilder.Append(FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz"Z"', ADateTime.Value));
+    tdtLocalDateTime:
+      FStringBuilder.Append(FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz', ADateTime.Value));
+    tdtLocalDate:
+      FStringBuilder.Append(FormatDateTime('yyyy-mm-dd', ADateTime.Value));
+    tdtLocalTime:
+      FStringBuilder.Append(FormatDateTime('hh:nn:ss.zzz', ADateTime.Value));
+  end;
 end;
 
 procedure TTOMLSerializer.WriteArray(const AArray: TTOMLArray);
@@ -333,7 +354,7 @@ begin
         FStringBuilder.Append('false');
         
     tvtDateTime:
-      WriteDateTime(AValue.AsDateTime);
+      WriteDateTime(TTOMLDateTime(AValue));
       
     tvtArray:
       WriteArray(AValue.AsArray);

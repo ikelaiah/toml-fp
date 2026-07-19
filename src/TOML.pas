@@ -33,6 +33,7 @@ uses
 type
   { Re-export main types for easier access }
   TTOMLValue = TOML.Types.TTOMLValue;
+  TTOMLDateTimeKind = TOML.Types.TTOMLDateTimeKind;
   TTOMLString = TOML.Types.TTOMLString;
   TTOMLInteger = TOML.Types.TTOMLInteger;
   TTOMLFloat = TOML.Types.TTOMLFloat;
@@ -184,4 +185,4 @@ begin
   Result := TOML.Serializer.SerializeTOMLToFile(AValue, AFileName);
 end;
 
-end. 
+end.

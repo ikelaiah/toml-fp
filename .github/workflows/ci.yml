@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Lazarus 4.8 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Lazarus 4.8 and FPC 3.2.2 (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          base_url="https://downloads.sourceforge.net/project/lazarus/Lazarus%20Linux%20amd64%20DEB/Lazarus%204.8"
+          curl --fail --location --silent --show-error "$base_url/fpc-laz_3.2.2-210709_amd64.deb" \
+            --output "$RUNNER_TEMP/fpc-laz.deb"
+          curl --fail --location --silent --show-error "$base_url/fpc-src_3.2.2-210709_amd64.deb" \
+            --output "$RUNNER_TEMP/fpc-src.deb"
+          curl --fail --location --silent --show-error "$base_url/lazarus-project_4.8.0-0_amd64.deb" \
+            --output "$RUNNER_TEMP/lazarus-project.deb"
+          echo "92000f2b831184e153aab0c910f8ae9240450e5c6d76dc189cf53116ee501d83  $RUNNER_TEMP/fpc-laz.deb" | sha256sum --check
+          echo "8c9e145d8056754a9ca39ce3e52e982b8e4816124984c5f542f2a874e721ad53  $RUNNER_TEMP/fpc-src.deb" | sha256sum --check
+          echo "401742cefb01ad99a628188034bf728fb5360d641ed2be5f91fb0ee183a301cd  $RUNNER_TEMP/lazarus-project.deb" | sha256sum --check
+          sudo apt-get update
+          sudo apt-get install --yes \
+            "$RUNNER_TEMP/fpc-laz.deb" \
+            "$RUNNER_TEMP/fpc-src.deb" \
+            "$RUNNER_TEMP/lazarus-project.deb"
+
+      - name: Install Lazarus 4.8 and FPC 3.2.2 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'lazarus-4.8-fpc-3.2.2-win64.exe'
+          $downloadUri = 'https://download.lazarus-ide.org/Lazarus%20Windows%2064%20bits/Lazarus%204.8/lazarus-4.8-fpc-3.2.2-win64.exe'
+          Invoke-WebRequest -Uri $downloadUri -OutFile $installer
+
+          $header = @(Get-Content -LiteralPath $installer -AsByteStream -TotalCount 2)
+          if ($header.Count -ne 2 -or $header[0] -ne 0x4D -or $header[1] -ne 0x5A) {
+            throw 'Lazarus download is not a Windows executable'
+          }
+
+          $actualHash = (Get-FileHash -Algorithm SHA256 $installer).Hash
+          $expectedHash = 'ED25EE171D55E23CF14E0633159FDD2325EFBA56E186F8AB817AD3BF97D267D7'
+          if ($actualHash -ne $expectedHash) {
+            throw "Unexpected Lazarus installer hash: $actualHash"
+          }
+          $process = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/DIR=C:\lazarus'
+          )
+          if ($process.ExitCode -ne 0) {
+            throw "Lazarus installer exited with code $($process.ExitCode)"
+          }
+          'C:\lazarus' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          'C:\lazarus\fpc\3.2.2\bin\x86_64-win64' |
+            Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify toolchain (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          test "$(lazbuild --version)" = "4.8"
+          test "$(fpc -iV)" = "3.2.2"
+
+      - name: Verify toolchain (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ((lazbuild --version).Trim() -ne '4.8') {
+            throw 'Expected Lazarus 4.8'
+          }
+          if ((fpc -iV).Trim() -ne '3.2.2') {
+            throw 'Expected FPC 3.2.2'
+          }
+
+      - name: Build Lazarus package
+        run: lazbuild --build-all packages/lazarus/toml_fp.lpk
+
+      - name: Build debug tests from scratch
+        run: lazbuild --build-all --build-mode=Debug tests/TestRunner.lpi
+
+      - name: Run debug tests (Linux)
+        if: runner.os == 'Linux'
+        run: ./tests/TestRunner --all --format=plain
+
+      - name: Run debug tests (Windows)
+        if: runner.os == 'Windows'
+        run: .\tests\TestRunner.exe --all --format=plain
+
+      - name: Build release tests from scratch
+        run: lazbuild --build-all --build-mode=Release tests/TestRunner.lpi
+
+      - name: Run release tests (Linux)
+        if: runner.os == 'Linux'
+        run: ./tests/TestRunner --all --format=plain
+
+      - name: Run release tests (Windows)
+        if: runner.os == 'Windows'
+        run: .\tests\TestRunner.exe --all --format=plain
+
+  conformance:
+    name: TOML 1.0 conformance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Lazarus 4.8 and FPC 3.2.2
+        shell: bash
+        run: |
+          base_url="https://downloads.sourceforge.net/project/lazarus/Lazarus%20Linux%20amd64%20DEB/Lazarus%204.8"
+          curl --fail --location --silent --show-error "$base_url/fpc-laz_3.2.2-210709_amd64.deb" \
+            --output "$RUNNER_TEMP/fpc-laz.deb"
+          curl --fail --location --silent --show-error "$base_url/fpc-src_3.2.2-210709_amd64.deb" \
+            --output "$RUNNER_TEMP/fpc-src.deb"
+          curl --fail --location --silent --show-error "$base_url/lazarus-project_4.8.0-0_amd64.deb" \
+            --output "$RUNNER_TEMP/lazarus-project.deb"
+          echo "92000f2b831184e153aab0c910f8ae9240450e5c6d76dc189cf53116ee501d83  $RUNNER_TEMP/fpc-laz.deb" | sha256sum --check
+          echo "8c9e145d8056754a9ca39ce3e52e982b8e4816124984c5f542f2a874e721ad53  $RUNNER_TEMP/fpc-src.deb" | sha256sum --check
+          echo "401742cefb01ad99a628188034bf728fb5360d641ed2be5f91fb0ee183a301cd  $RUNNER_TEMP/lazarus-project.deb" | sha256sum --check
+          sudo apt-get update
+          sudo apt-get install --yes \
+            "$RUNNER_TEMP/fpc-laz.deb" \
+            "$RUNNER_TEMP/fpc-src.deb" \
+            "$RUNNER_TEMP/lazarus-project.deb"
+          test "$(lazbuild --version)" = "4.8"
+          test "$(fpc -iV)" = "3.2.2"
+
+      - name: Build toml-test decoder
+        shell: bash
+        run: |
+          mkdir -p tests/conformance/lib
+          fpc -MObjFPC -Sh -Fu./src \
+            -FU./tests/conformance/lib \
+            -FE./tests/conformance \
+            ./tests/conformance/TOMLTestDecoder.lpr
+
+      - name: Download toml-test v2.2.0
+        shell: bash
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/toml-lang/toml-test/releases/download/v2.2.0/toml-test-v2.2.0-linux-amd64.gz \
+            --output "$RUNNER_TEMP/toml-test.gz"
+          echo "08f9e0a97da1151c33debf01358a8f5ef45e2a56be201241ae5eb5c2e9323fef  $RUNNER_TEMP/toml-test.gz" \
+            | sha256sum --check
+          gzip --decompress --stdout "$RUNNER_TEMP/toml-test.gz" > "$RUNNER_TEMP/toml-test"
+          chmod +x "$RUNNER_TEMP/toml-test"
+
+      - name: Run TOML 1.0 conformance gate
+        shell: bash
+        run: bash tests/conformance/run-conformance.sh "$RUNNER_TEMP/toml-test"

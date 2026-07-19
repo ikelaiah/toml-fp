@@ -1,16 +1,21 @@
+<p align="center">
+  <img src="docs/assets/toml-fp-logo.svg" alt="TOML-FP — TOML for Free Pascal" width="760">
+</p>
+
 # TOML Parser for Free Pascal
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Free Pascal](https://img.shields.io/badge/Free%20Pascal-3.2.2-blue.svg)](https://www.freepascal.org/)
-[![Lazarus](https://img.shields.io/badge/Lazarus-4.0-orange.svg)](https://www.lazarus-ide.org/)
+[![Lazarus](https://img.shields.io/badge/Lazarus-4.8-orange.svg)](https://www.lazarus-ide.org/)
 [![TOML](https://img.shields.io/badge/TOML-1.0.0-green.svg)](https://toml.io/)
-[![Version](https://img.shields.io/badge/Version-1.0.4-blueviolet.svg)]()
+[![CI](https://github.com/ikelaiah/toml-fp/actions/workflows/ci.yml/badge.svg)](https://github.com/ikelaiah/toml-fp/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/Version-1.0.5-blueviolet.svg)]()
 
 A robust [TOML (Tom's Obvious, Minimal Language)](https://toml.io/) parser and serializer for Free Pascal with broad TOML v1.0.0 support, including nested tables, arrays of tables, quoted dotted keys, Unicode escapes, strict basic-string escape handling, and local date/time values.
 
 > [!NOTE] 
 > 
-> Our extensive test suite (70 tests) covers the TOML v1.0.0 behavior implemented by TOML-FP across core data types, structures, serialization, and error cases.
+> Our test suite includes 75 project tests plus a pinned TOML 1.0 conformance gate. See [Testing](#testing) for the measured support baseline.
 
 ## Table of Contents
 
@@ -57,24 +62,26 @@ TOML-FP provides a complete solution for working with TOML configuration files i
 
 ## Features
 
-- **Full TOML v1.0.0 Compliance:** Supports all TOML data types and structures, including proper serialization of nested (dotted) tables.
+- **Broad TOML v1.0.0 Support:** Supports all core TOML data types and structures, including nested dotted keys and date/time variants. Remaining conformance gaps are tracked explicitly.
 - **Type-Safe API:** Strong typing with compile-time checks
 - **Memory Management:** Automatic cleanup with proper object lifecycle management
 - **Error Handling:** Detailed error messages and exception handling
 - **Serialization:** Convert Pascal objects to TOML and back
 - **Documentation:** Comprehensive examples and API documentation
-- **Test Suite:** Comprehensive test suite (70 items)
+- **Test Suite:** 75 project tests plus the official `toml-test` decoder suite
 
 ## To Do / In Progress
 
 - [ ] More tests for error handling: Robust testing of invalid inputs and ensuring appropriate error messages or handling mechanisms.
+- [ ] Close the remaining decoder gaps listed in `tests/conformance/known-failures.txt`
+- [ ] Add official encoder conformance coverage
 - [ ] Performance optimization for large TOML files
 - [ ] Additional examples for common use cases
 
 ## Requirements
 
 - Free Pascal Compiler 3.2.2 or later
-- Lazarus IDE 4.0 (for running tests)
+- Lazarus IDE 4.8 or later (required for package and test project builds)
 
 ## Installation
 
@@ -497,12 +504,22 @@ Serializes a `TTOMLValue` and saves it to the specified file. Returns `True` on 
 
 ## Testing
 
-The library includes a comprehensive test suite (70 items). 
+The library includes 75 project tests. The v1.0.5 release was validated locally with Lazarus 4.8 and FPC 3.2.2. GitHub Actions uses the same toolchain to build the Lazarus package and run clean Debug and Release test builds on Linux and Windows.
 
 To run the tests:
 
-1. Open `tests/TestRunner.lpi` in Lazarus
-2. Build and run the project
+From the repository root:
+
+```text
+lazbuild --build-all --build-mode=Debug tests/TestRunner.lpi
+tests/TestRunner --all --format=plain
+lazbuild --build-all --build-mode=Release tests/TestRunner.lpi
+tests/TestRunner --all --format=plain
+```
+
+Use `tests\\TestRunner.exe` on Windows. You can also open `tests/TestRunner.lpi` in Lazarus and run either build mode.
+
+The pinned [`toml-test` conformance gate](tests/conformance/README.md) currently passes 186/205 valid decoder cases and rejects 431/474 invalid cases. Its 62 known gaps are named explicitly; encoder conformance is not yet covered.
 
 ### Test Coverage Overview
 
@@ -522,24 +539,17 @@ See [Test-Coverage-Overview.md](docs/Test-Coverage-Overview.md) for details.
 ### Sample Test Output
 
 ```bash
-$ ./TestRunner.exe -a --format=plain
- Time:00.032 N:70 E:0 F:0 I:0
-  TTOMLTestCase Time:00.032 N:70 E:0 F:0 I:0
+$ ./TestRunner --all --format=plain
+ Time:00.032 N:75 E:0 F:0 I:0
+  TTOMLTestCase Time:00.032 N:75 E:0 F:0 I:0
     Test01_StringValue
     Test02_IntegerValue
     ...
-    Test72_LiteralDottedKeyTable
+    Test77_DateTimeSerializationPreservesOffset
 
-Number of run tests: 70
+Number of run tests: 75
 Number of errors:    0
 Number of failures:  0
-
-Heap dump by heaptrc unit of path\to\TestRunner.exe
-4417 memory blocks allocated : 289154/309056
-4417 memory blocks freed     : 289154/309056
-0 unfreed memory blocks : 0
-True heap size : 294912 (256 used in System startup)
-True free heap : 294656
 ``` 
 
 ## Examples
