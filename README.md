@@ -9,13 +9,13 @@
 [![Lazarus](https://img.shields.io/badge/Lazarus-4.8-orange.svg)](https://www.lazarus-ide.org/)
 [![TOML](https://img.shields.io/badge/TOML-1.0.0-green.svg)](https://toml.io/)
 [![CI](https://github.com/ikelaiah/toml-fp/actions/workflows/ci.yml/badge.svg)](https://github.com/ikelaiah/toml-fp/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/Version-1.0.5-blueviolet.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.0.6-blueviolet.svg)]()
 
 A robust [TOML (Tom's Obvious, Minimal Language)](https://toml.io/) parser and serializer for Free Pascal with broad TOML v1.0.0 support, including nested tables, arrays of tables, quoted dotted keys, Unicode escapes, strict basic-string escape handling, and local date/time values.
 
 > [!NOTE] 
 > 
-> Our test suite includes 75 project tests plus a pinned TOML 1.0 conformance gate. See [Testing](#testing) for the measured support baseline.
+> Our test suite includes 82 project tests plus a pinned TOML 1.0 conformance gate. See [Testing](#testing) for the measured support baseline.
 
 ## Table of Contents
 
@@ -68,7 +68,7 @@ TOML-FP provides a complete solution for working with TOML configuration files i
 - **Error Handling:** Detailed error messages and exception handling
 - **Serialization:** Convert Pascal objects to TOML and back
 - **Documentation:** Comprehensive examples and API documentation
-- **Test Suite:** 75 project tests plus the official `toml-test` decoder suite
+- **Test Suite:** 82 project tests plus the official `toml-test` decoder suite
 
 ## To Do / In Progress
 
@@ -504,7 +504,7 @@ Serializes a `TTOMLValue` and saves it to the specified file. Returns `True` on 
 
 ## Testing
 
-The library includes 75 project tests. The v1.0.5 release was validated locally with Lazarus 4.8 and FPC 3.2.2. GitHub Actions uses the same toolchain to build the Lazarus package and run clean Debug and Release test builds on Linux and Windows.
+The library includes 82 project tests. The v1.0.6 release was validated locally with Lazarus 4.8 and FPC 3.2.2. GitHub Actions uses the same toolchain to build the Lazarus package and run clean Debug and Release test builds on Linux and Windows.
 
 To run the tests:
 
@@ -519,7 +519,7 @@ tests/TestRunner --all --format=plain
 
 Use `tests\\TestRunner.exe` on Windows. You can also open `tests/TestRunner.lpi` in Lazarus and run either build mode.
 
-The pinned [`toml-test` conformance gate](tests/conformance/README.md) currently passes 186/205 valid decoder cases and rejects 431/474 invalid cases. Its 62 known gaps are named explicitly; encoder conformance is not yet covered.
+The pinned [`toml-test` conformance gate](tests/conformance/README.md) currently passes 199/205 valid decoder cases and rejects 445/474 invalid cases. Its 35 known gaps are named explicitly; encoder conformance is not yet covered.
 
 ### Test Coverage Overview
 

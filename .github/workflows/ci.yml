@@ -2,7 +2,17 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
+    tags:
+      - 'v*'
   pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -11,6 +21,7 @@ jobs:
   build-and-test:
     name: Lazarus 4.8 / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -116,6 +127,7 @@ jobs:
   conformance:
     name: TOML 1.0 conformance
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Check out source

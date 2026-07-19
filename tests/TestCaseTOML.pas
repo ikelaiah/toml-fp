@@ -98,6 +98,13 @@ type
     procedure Test75_DottedKeysCreateNestedTables;
     procedure Test76_StrictLexicalRejections;
     procedure Test77_DateTimeSerializationPreservesOffset;
+    procedure Test78_BareKeyForms;
+    procedure Test79_NumericDottedKeys;
+    procedure Test80_DateLikeKeys;
+    procedure Test81_TableNameForms;
+    procedure Test82_RejectMultilineKeys;
+    procedure Test83_RejectMissingKeyValueLineBreak;
+    procedure Test84_KeySerializationRoundTrip;
   end;
 
 implementation
@@ -1851,6 +1858,201 @@ begin
       Pos('offset = 1979-05-27T07:32:00-07:30', Serialized) > 0);
     AssertTrue('Lowercase datetime markers are normalized',
       Pos('utc = 1979-05-27T07:32:00Z', Serialized) > 0);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test78_BareKeyForms;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(
+    '000111 = "leading"' + LineEnding +
+    '10e3 = "not a float"' + LineEnding +
+    '34-11 = 23' + LineEnding +
+    '-key = 7' + LineEnding +
+    '_ = false');
+  try
+    AssertTrue('Leading-zero bare key exists', Doc.TryGetValue('000111', Value));
+    AssertEquals('Leading-zero bare key value', 'leading', Value.AsString);
+    AssertTrue('Exponent-like bare key exists', Doc.TryGetValue('10e3', Value));
+    AssertEquals('Exponent-like key remains a string key', 'not a float', Value.AsString);
+    AssertTrue('Dashed numeric key exists', Doc.TryGetValue('34-11', Value));
+    AssertEquals('Dashed numeric key value', 23, Value.AsInteger);
+    AssertTrue('Dash-prefixed key exists', Doc.TryGetValue('-key', Value));
+    AssertEquals('Dash-prefixed key value', 7, Value.AsInteger);
+    AssertTrue('Underscore key exists', Doc.TryGetValue('_', Value));
+    AssertFalse('Underscore key value', Value.AsBoolean);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test79_NumericDottedKeys;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(
+    '1.2 = true' + LineEnding +
+    '3.14159 = "pi"');
+  try
+    AssertTrue('Numeric parent key exists', Doc.TryGetValue('1', Value));
+    AssertTrue('Numeric child key exists', Value.AsTable.TryGetValue('2', Value));
+    AssertTrue('Numeric dotted key value', Value.AsBoolean);
+
+    AssertTrue('Pi parent key exists', Doc.TryGetValue('3', Value));
+    AssertTrue('Pi child key exists', Value.AsTable.TryGetValue('14159', Value));
+    AssertEquals('Pi dotted key value', 'pi', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test80_DateLikeKeys;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(
+    '2001-02-03 = 1' + LineEnding +
+    'a.2001-02-08 = 7' + LineEnding +
+    '[2002-01-02.2024-01-03]' + LineEnding +
+    'k = 11');
+  try
+    AssertTrue('Date-like bare key exists', Doc.TryGetValue('2001-02-03', Value));
+    AssertEquals('Date-like bare key value', 1, Value.AsInteger);
+    AssertTrue('Dotted key parent exists', Doc.TryGetValue('a', Value));
+    AssertTrue('Date-like dotted component exists',
+      Value.AsTable.TryGetValue('2001-02-08', Value));
+    AssertEquals('Date-like dotted key value', 7, Value.AsInteger);
+    AssertTrue('Date-like table exists', Doc.TryGetValue('2002-01-02', Value));
+    AssertTrue('Nested date-like table exists',
+      Value.AsTable.TryGetValue('2024-01-03', Value));
+    AssertTrue('Nested table value exists', Value.AsTable.TryGetValue('k', Value));
+    AssertEquals('Nested table value', 11, Value.AsInteger);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test81_TableNameForms;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(
+    '[a.b.c]' + LineEnding +
+    'key = 1' + LineEnding +
+    '[a."b.c"]' + LineEnding +
+    'key = 2' + LineEnding +
+    '[x.1.2]' + LineEnding +
+    'key = 8');
+  try
+    AssertTrue('Table a exists', Doc.TryGetValue('a', Value));
+    AssertTrue('Table a.b exists', Value.AsTable.TryGetValue('b', Value));
+    AssertTrue('Table a.b.c exists', Value.AsTable.TryGetValue('c', Value));
+    AssertTrue('Table a.b.c value exists', Value.AsTable.TryGetValue('key', Value));
+    AssertEquals('Table a.b.c value', 1, Value.AsInteger);
+
+    AssertTrue('Table a still exists', Doc.TryGetValue('a', Value));
+    AssertTrue('Quoted table component remains literal',
+      Value.AsTable.TryGetValue('b.c', Value));
+    AssertTrue('Quoted table value exists', Value.AsTable.TryGetValue('key', Value));
+    AssertEquals('Quoted table value', 2, Value.AsInteger);
+
+    AssertTrue('Table x exists', Doc.TryGetValue('x', Value));
+    AssertTrue('Numeric table component 1 exists', Value.AsTable.TryGetValue('1', Value));
+    AssertTrue('Numeric table component 2 exists', Value.AsTable.TryGetValue('2', Value));
+    AssertTrue('Numeric table value exists', Value.AsTable.TryGetValue('key', Value));
+    AssertEquals('Numeric table value', 8, Value.AsInteger);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test82_RejectMultilineKeys;
+var
+  InvalidDocuments: array[0..3] of string;
+  I: Integer;
+  Doc: TTOMLTable;
+begin
+  InvalidDocuments[0] := '"""key""" = 1';
+  InvalidDocuments[1] := StringOfChar('''', 3) + 'key' +
+    StringOfChar('''', 3) + ' = 1';
+  InvalidDocuments[2] := '["""table"""]' + LineEnding + 'key = 1';
+  InvalidDocuments[3] := '[' + StringOfChar('''', 3) + 'table' +
+    StringOfChar('''', 3) + ']' + LineEnding + 'key = 1';
+
+  for I := Low(InvalidDocuments) to High(InvalidDocuments) do
+  begin
+    Doc := nil;
+    try
+      Doc := ParseTOML(InvalidDocuments[I]);
+      FreeAndNil(Doc);
+      Fail('Multiline key was accepted: ' + InvalidDocuments[I]);
+    except
+      on E: ETOMLParserException do
+        Doc.Free;
+    end;
+  end;
+end;
+
+procedure TTOMLTestCase.Test83_RejectMissingKeyValueLineBreak;
+const
+  InvalidDocuments: array[0..2] of string = (
+    'a = 1 b = 2',
+    '0=0r=false',
+    '[table] key = 1'
+  );
+var
+  I: Integer;
+  Doc: TTOMLTable;
+begin
+  for I := Low(InvalidDocuments) to High(InvalidDocuments) do
+  begin
+    Doc := nil;
+    try
+      Doc := ParseTOML(InvalidDocuments[I]);
+      FreeAndNil(Doc);
+      Fail('Missing line break was accepted: ' + InvalidDocuments[I]);
+    except
+      on E: ETOMLParserException do
+        Doc.Free;
+    end;
+  end;
+end;
+
+procedure TTOMLTestCase.Test84_KeySerializationRoundTrip;
+var
+  Doc, RoundTrip: TTOMLTable;
+  Serialized: string;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(
+    '000111 = "leading"' + LineEnding +
+    '1.2 = true' + LineEnding +
+    'quoted."dotted.key" = 42');
+  try
+    Serialized := SerializeTOML(Doc);
+    RoundTrip := ParseTOML(Serialized);
+    try
+      AssertTrue('Round-trip leading-zero key exists',
+        RoundTrip.TryGetValue('000111', Value));
+      AssertEquals('Round-trip leading-zero key value', 'leading', Value.AsString);
+      AssertTrue('Round-trip numeric parent exists', RoundTrip.TryGetValue('1', Value));
+      AssertTrue('Round-trip numeric child exists', Value.AsTable.TryGetValue('2', Value));
+      AssertTrue('Round-trip numeric value', Value.AsBoolean);
+      AssertTrue('Round-trip quoted parent exists',
+        RoundTrip.TryGetValue('quoted', Value));
+      AssertTrue('Round-trip literal dotted key exists',
+        Value.AsTable.TryGetValue('dotted.key', Value));
+      AssertEquals('Round-trip literal dotted key value', 42, Value.AsInteger);
+    finally
+      RoundTrip.Free;
+    end;
   finally
     Doc.Free;
   end;
