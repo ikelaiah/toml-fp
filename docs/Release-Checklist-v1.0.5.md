@@ -14,13 +14,13 @@
 - [x] Build the Lazarus package from scratch.
 - [x] Build and run all 75 Debug tests; confirm zero errors, failures, and heap leaks.
 - [x] Build and run all 75 Release tests.
-- [x] Build the conformance decoder and run `toml-test` v2.2.0; confirm 184 valid passes, 431 invalid passes, and 64 guarded skips.
+- [x] Build the conformance decoder and run `toml-test` v2.2.0; confirm 186 valid passes, 431 invalid passes, and 62 guarded skips.
 - [x] Run `git diff --check` and review the complete `v1.0.4..HEAD` diff.
 
 ## GitHub gate
 
-- [ ] Push `release/v1.0.5` and open a pull request.
-- [ ] Require both OS matrix jobs and the conformance job to pass.
+- [x] Push `release/v1.0.5` and open a pull request.
+- [x] Require both OS matrix jobs and the conformance job to pass.
 - [ ] Merge only after review confirms the public API additions are backward compatible.
 
 ## Publish

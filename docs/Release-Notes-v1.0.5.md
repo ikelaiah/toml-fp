@@ -22,12 +22,12 @@ Version 1.0.5 is a release-reliability and TOML 1.0 conformance patch. It fixes 
 
 - GitHub Actions builds the package and runs clean Debug and Release tests on Linux and Windows with Lazarus 4.8 / FPC 3.2.2, matching the locally validated toolchain.
 - The project suite has 75 tests with zero errors, failures, or Debug heap leaks.
-- The pinned `toml-test` v2.2.0 TOML 1.0 decoder baseline passes 184/205 valid cases and rejects 431/474 invalid cases.
-- All 64 outstanding conformance gaps are listed in `tests/conformance/known-failures.txt`; `-skip-must-err` makes stale exclusions fail CI.
+- The pinned `toml-test` v2.2.0 TOML 1.0 decoder baseline passes 186/205 valid cases and rejects 431/474 invalid cases.
+- All 62 outstanding conformance gaps are listed in `tests/conformance/known-failures.txt`; `-skip-must-err` makes stale exclusions fail CI.
 
 ## Scope deferred beyond 1.0.5
 
-- The 64 named decoder conformance gaps, primarily table redefinition rules, UTF-8 validation, multiline edge cases, numeric bare keys, and extreme numeric precision.
+- The 62 named decoder conformance gaps, primarily table redefinition rules, UTF-8 validation, multiline edge cases, bare-key forms, and date/integer boundaries.
 - Official encoder conformance.
 - Performance work and larger API changes.
 

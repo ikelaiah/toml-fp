@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed clean Release builds by adding the source directory to the Release and global Lazarus project search paths.
 - Added Linux and Windows CI for clean package, Debug-test, and Release-test builds with Lazarus 4.8 and FPC 3.2.2.
-- Added a pinned `toml-test` v2.2.0 decoder adapter and regression gate. The v1.0.5 baseline passes 184/205 valid cases and rejects 431/474 invalid cases; the 64 remaining gaps are tracked explicitly.
+- Added a pinned `toml-test` v2.2.0 decoder adapter and regression gate. The v1.0.5 baseline passes 186/205 valid cases and rejects 431/474 invalid cases; the 62 remaining gaps are tracked explicitly.
 - Fixed dotted key-value parsing so syntactic dotted keys create nested tables while quoted dotted components stay literal.
 - Added array trailing-comma support.
 - Preserved TOML date/time kinds and original offset syntax for correct serialization, including lowercase `t` and `z` input.

@@ -519,7 +519,7 @@ tests/TestRunner --all --format=plain
 
 Use `tests\\TestRunner.exe` on Windows. You can also open `tests/TestRunner.lpi` in Lazarus and run either build mode.
 
-The pinned [`toml-test` conformance gate](tests/conformance/README.md) currently passes 184/205 valid decoder cases and rejects 431/474 invalid cases. Its 64 known gaps are named explicitly; encoder conformance is not yet covered.
+The pinned [`toml-test` conformance gate](tests/conformance/README.md) currently passes 186/205 valid decoder cases and rejects 431/474 invalid cases. Its 62 known gaps are named explicitly; encoder conformance is not yet covered.
 
 ### Test Coverage Overview
 

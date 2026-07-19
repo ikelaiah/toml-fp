@@ -18,9 +18,9 @@ The Debug build runs with `heaptrc`; the release gate requires 75 tests, zero er
 
 CI pins [`toml-test`](https://github.com/toml-lang/toml-test) v2.2.0 to the TOML 1.0 profile through `tests/conformance/TOMLTestDecoder.lpr`.
 
-- Valid decoder cases: 184 of 205 pass.
+- Valid decoder cases: 186 of 205 pass.
 - Invalid decoder cases: 431 of 474 are rejected.
-- Known gaps: 64 named exclusions guarded by `-skip-must-err`.
+- Known gaps: 62 named exclusions guarded by `-skip-must-err`.
 - Encoder cases: not yet covered.
 
 See [`tests/conformance/README.md`](../tests/conformance/README.md) for build and run instructions. The measured figures are deliberately more precise than a blanket “fully compliant” claim.
