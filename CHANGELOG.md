@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-### v1.0.5 - Conformance and Release Reliability (2026-07-18)
+### v1.0.5 - Conformance and Release Reliability (2026-07-19)
 
 - Fixed clean Release builds by adding the source directory to the Release and global Lazarus project search paths.
 - Added Linux and Windows CI for clean package, Debug-test, and Release-test builds with Lazarus 4.8 and FPC 3.2.2.
