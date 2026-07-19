@@ -2,7 +2,7 @@
 
 ## Release date
 
-2026-07-21
+2026-07-20
 
 ## Highlights
 

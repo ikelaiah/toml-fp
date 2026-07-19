@@ -8,7 +8,7 @@
 - [x] Make decoder float output deterministic across supported platforms.
 - [x] Expand focused project regression coverage from 75 to 82 tests.
 - [x] Deduplicate and bound CI runs.
-- [x] Set the release date to 2026-07-21.
+- [x] Set the release date to 2026-07-20.
 - [x] Synchronize package, README, changelog, coverage, conformance, and release-note metadata.
 
 ## Local gate
