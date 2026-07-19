@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-### v1.0.6 - Key Grammar and Parser Hardening (2026-07-21)
+### v1.0.6 - Key Grammar and Parser Hardening (2026-07-20)
 
 - Added context-aware key tokenization so numeric, date-like, leading-zero, and dash-prefixed bare keys no longer inherit value-number validation rules.
 - Fixed numeric dotted keys and numeric table-name components so each dot creates the required nested table path.
