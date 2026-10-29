@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+### v1.1.0 - TOML 1.1.0 Support (2026-10-30)
+
+- Added TOML 1.1.0 syntax: `\e` and `\xHH` escapes in basic strings, optional seconds in date-time and time values, and newlines, comments and trailing commas in inline tables.
+- Tracked how every table and array is defined so redefining a table, extending a table through a dotted key from another section, and extending inline tables or static arrays are rejected.
+- Required adjacent brackets in `[[array]]` headers.
+- Rejected input that is not valid UTF-8 and skipped a leading UTF-8 byte order mark.
+- Rejected bare carriage returns in strings; accepted three to five closing quotes in multiline strings (for example `""""quoted""""`).
+- Fixed a local date followed by a space and a comment losing its date, and added support for the `Int64` minimum value.
+- Serializer: DEL (`U+007F`) is now escaped in strings and keys, and date/time values are always written with seconds so TOML 1.0 parsers can read the output. Added `TTOMLDateTime.CanonicalText` for the normalized text.
+- Moved the pinned `toml-test` v2.2.0 gate to the TOML 1.1 profile. It passes 214/214 valid and 467/467 invalid decoder cases, and `known-failures.txt` is now empty (it was 35 guarded gaps).
+- Expanded the project suite from 82 to 94 tests.
+- CI: added a Debug heap-leak check, example builds on Linux and Windows, a release-metadata consistency check (`scripts/check-release-metadata.sh`), a tag-driven GitHub release job, and Dependabot updates for pinned actions.
+- Stopped tracking the generated `tests/TestRunner.lps` session file.
+- Behavior notes: there is no TOML 1.0-only strict mode, and documents that previously relied on lenient table merging or non-UTF-8 bytes now raise `ETOMLParserException`.
+
 ### v1.0.6 - Key Grammar and Parser Hardening (2026-07-20)
 
 - Added context-aware key tokenization so numeric, date-like, leading-zero, and dash-prefixed bare keys no longer inherit value-number validation rules.

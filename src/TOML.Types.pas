@@ -6,7 +6,7 @@
   - Type conversion and validation
   - Memory management for TOML data structures
   
-  The type system follows the TOML v1.0.0 specification and ensures type safety through
+  The type system follows the TOML v1.1.0 specification and ensures type safety through
   runtime checks and explicit type conversions.
 }
 unit TOML.Types;
@@ -34,7 +34,7 @@ type
     tvtInlineTable  // Inline table value type (compact table representation)
   );
 
-  { Distinguishes the four date/time types defined by TOML 1.0. }
+  { Distinguishes the four date/time types defined by TOML 1.0 and 1.1. }
   TTOMLDateTimeKind = (
     tdtOffsetDateTime,
     tdtLocalDateTime,
@@ -168,6 +168,11 @@ type
       const AKind: TTOMLDateTimeKind; const ARawValue: string); overload;
     property Value: TDateTime read FValue write FValue;
     property Kind: TTOMLDateTimeKind read FKind;
+    { Returns the value as RFC 3339 text for serialization. Source text is
+      kept but normalized: a space or lowercase t becomes T, a lowercase z
+      becomes Z, and omitted seconds (TOML 1.1) are written as :00 so that
+      TOML 1.0 readers accept the result }
+    function CanonicalText: string;
     property RawValue: string read FRawValue;
   end;
 
@@ -361,6 +366,41 @@ begin
   FValue := AValue;
   FKind := AKind;
   FRawValue := ARawValue;
+end;
+
+function TTOMLDateTime.CanonicalText: string;
+var
+  TimeStart: Integer;
+begin
+  if FRawValue = '' then
+  begin
+    case FKind of
+      tdtOffsetDateTime:
+        Result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz"Z"', FValue);
+      tdtLocalDateTime:
+        Result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz', FValue);
+      tdtLocalDate:
+        Result := FormatDateTime('yyyy-mm-dd', FValue);
+      tdtLocalTime:
+        Result := FormatDateTime('hh:nn:ss.zzz', FValue);
+    end;
+    Exit;
+  end;
+
+  Result := FRawValue;
+  if (Length(Result) >= 11) and (Result[11] in [' ', 't']) then
+    Result[11] := 'T';
+  if (Result <> '') and (Result[Length(Result)] = 'z') then
+    Result[Length(Result)] := 'Z';
+
+  if FKind = tdtLocalDate then
+    Exit;
+  if FKind = tdtLocalTime then
+    TimeStart := 1
+  else
+    TimeStart := 12;
+  if (Length(Result) < TimeStart + 5) or (Result[TimeStart + 5] <> ':') then
+    Insert(':00', Result, TimeStart + 5);
 end;
 
 function TTOMLDateTime.GetAsDateTime: TDateTime;

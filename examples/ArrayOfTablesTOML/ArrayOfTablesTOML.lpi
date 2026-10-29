@@ -61,6 +61,7 @@
             <Filename Value="ArrayOfTablesTOML"/>
           </Target>
           <SearchPaths>
+            <OtherUnitFiles Value="..\..\src"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <CodeGeneration>
@@ -100,6 +101,7 @@
       <Filename Value="ArrayOfTablesTOML"/>
     </Target>
     <SearchPaths>
+      <OtherUnitFiles Value="..\..\src"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
   </CompilerOptions>

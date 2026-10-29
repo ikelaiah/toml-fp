@@ -67,27 +67,9 @@ var
   DotPosition, FractionEnd, FractionLength: Integer;
   Fraction: string;
 begin
-  if AValue.RawValue = '' then
-  begin
-    case AValue.Kind of
-      tdtOffsetDateTime:
-        Result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz"Z"', AValue.Value);
-      tdtLocalDateTime:
-        Result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz', AValue.Value);
-      tdtLocalDate:
-        Result := FormatDateTime('yyyy-mm-dd', AValue.Value);
-      tdtLocalTime:
-        Result := FormatDateTime('hh:nn:ss.zzz', AValue.Value);
-    end;
-    Exit;
-  end;
+  Result := AValue.CanonicalText;
 
-  Result := AValue.RawValue;
-  if (Length(Result) >= 11) and (Result[11] in [' ', 't']) then
-    Result[11] := 'T';
-  if (Result <> '') and (Result[Length(Result)] = 'z') then
-    Result[Length(Result)] := 'Z';
-
+  // The expected JSON always carries exactly three fractional digits.
   DotPosition := Pos('.', Result);
   if DotPosition > 0 then
   begin

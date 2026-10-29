@@ -7,15 +7,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Free Pascal](https://img.shields.io/badge/Free%20Pascal-3.2.2-blue.svg)](https://www.freepascal.org/)
 [![Lazarus](https://img.shields.io/badge/Lazarus-4.8-orange.svg)](https://www.lazarus-ide.org/)
-[![TOML](https://img.shields.io/badge/TOML-1.0.0-green.svg)](https://toml.io/)
+[![TOML](https://img.shields.io/badge/TOML-1.1.0-green.svg)](https://toml.io/)
 [![CI](https://github.com/ikelaiah/toml-fp/actions/workflows/ci.yml/badge.svg)](https://github.com/ikelaiah/toml-fp/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/Version-1.0.6-blueviolet.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.0-blueviolet.svg)]()
 
-A robust [TOML (Tom's Obvious, Minimal Language)](https://toml.io/) parser and serializer for Free Pascal with broad TOML v1.0.0 support, including nested tables, arrays of tables, quoted dotted keys, Unicode escapes, strict basic-string escape handling, and local date/time values.
+A robust [TOML (Tom's Obvious, Minimal Language)](https://toml.io/) parser and serializer for Free Pascal with full [TOML v1.1.0](https://toml.io/en/v1.1.0) support, including nested tables, arrays of tables, multi-line inline tables, quoted dotted keys, `\e` and `\xHH` escapes, optional seconds in times, and strict table-definition rules.
 
 > [!NOTE] 
 > 
-> Our test suite includes 82 project tests plus a pinned TOML 1.0 conformance gate. See [Testing](#testing) for the measured support baseline.
+> Our test suite includes 94 project tests plus a pinned TOML 1.1 conformance gate that passes every official decoder case. See [Testing](#testing) for the measured support baseline.
 
 ## Table of Contents
 
@@ -62,18 +62,43 @@ TOML-FP provides a complete solution for working with TOML configuration files i
 
 ## Features
 
-- **Broad TOML v1.0.0 Support:** Supports all core TOML data types and structures, including nested dotted keys and date/time variants. Remaining conformance gaps are tracked explicitly.
+- **TOML v1.1.0 Support:** Decodes all 214 valid cases and rejects all 467 invalid cases of the official `toml-test` v2.2.0 suite. Valid TOML 1.0 documents remain valid.
 - **Type-Safe API:** Strong typing with compile-time checks
 - **Memory Management:** Automatic cleanup with proper object lifecycle management
 - **Error Handling:** Detailed error messages and exception handling
 - **Serialization:** Convert Pascal objects to TOML and back
 - **Documentation:** Practical examples and API documentation
-- **Test Suite:** 82 project tests plus the official `toml-test` decoder suite
+- **Test Suite:** 94 project tests plus the official `toml-test` decoder suite
+
+### What TOML 1.1 adds
+
+TOML-FP v1.1.0 accepts the three syntax additions of [TOML v1.1.0](https://toml.io/en/v1.1.0):
+
+```toml
+# \e (escape) and \xHH (code points up to U+00FF) in basic strings
+prompt = "\e[1mready\e[0m"
+latin  = "caf\xe9"
+
+# Seconds are optional in times and date-times
+start = 07:32
+meeting = 2026-03-14 09:30-07:00
+
+# Inline tables may span lines, carry comments, and end with a comma
+server = {
+  host = "localhost",   # primary
+  ports = [8080, 8081],
+}
+```
+
+Compatibility notes:
+
+- There is no TOML 1.0-only strict mode; documents using the syntax above are accepted.
+- The serializer always writes seconds (for example `07:32:00`), so its output stays readable by TOML 1.0 parsers.
+- Input must be valid UTF-8 (a leading byte order mark is skipped), and redefining a table, extending an inline table or extending a static array now raises `ETOMLParserException`, as the specification requires.
 
 ## To Do / In Progress
 
 - [ ] More tests for error handling: Robust testing of invalid inputs and ensuring appropriate error messages or handling mechanisms.
-- [ ] Close the remaining decoder gaps listed in `tests/conformance/known-failures.txt`
 - [ ] Add official encoder conformance coverage
 - [ ] Performance optimization for large TOML files
 - [ ] Additional examples for common use cases
@@ -504,7 +529,7 @@ Serializes a `TTOMLValue` and saves it to the specified file. Returns `True` on 
 
 ## Testing
 
-The library includes 82 project tests. The v1.0.6 release was validated locally with Lazarus 4.8 and FPC 3.2.2. GitHub Actions uses the same toolchain to build the Lazarus package and run clean Debug and Release test builds on Linux and Windows.
+The library includes 94 project tests. The v1.1.0 release was validated locally with Lazarus 4.8 and FPC 3.2.2. GitHub Actions uses the same toolchain to build the Lazarus package and run clean Debug and Release test builds on Linux and Windows.
 
 To run the tests:
 
@@ -519,7 +544,7 @@ tests/TestRunner --all --format=plain
 
 Use `tests\\TestRunner.exe` on Windows. You can also open `tests/TestRunner.lpi` in Lazarus and run either build mode.
 
-The pinned [`toml-test` conformance gate](tests/conformance/README.md) currently passes 199/205 valid decoder cases and rejects 445/474 invalid cases. Its 35 known gaps are named explicitly; encoder conformance is not yet covered.
+The pinned [`toml-test` conformance gate](tests/conformance/README.md) runs against the TOML 1.1 profile and currently passes 214/214 valid decoder cases and rejects 467/467 invalid cases, with no known gaps. Encoder conformance is not yet covered.
 
 ### Test Coverage Overview
 
@@ -540,14 +565,14 @@ See [Test-Coverage-Overview.md](docs/Test-Coverage-Overview.md) for details.
 
 ```bash
 $ ./TestRunner --all --format=plain
- Time:00.032 N:82 E:0 F:0 I:0
-  TTOMLTestCase Time:00.032 N:82 E:0 F:0 I:0
+ Time:00.032 N:94 E:0 F:0 I:0
+  TTOMLTestCase Time:00.032 N:94 E:0 F:0 I:0
     Test01_StringValue
     Test02_IntegerValue
     ...
-    Test84_KeySerializationRoundTrip
+    Test96_SerializerEscapesDelete
 
-Number of run tests: 82
+Number of run tests: 94
 Number of errors:    0
 Number of failures:  0
 ``` 
