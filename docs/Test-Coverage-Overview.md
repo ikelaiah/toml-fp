@@ -14,7 +14,7 @@ The FPCUnit project contains 94 tests covering:
 - v1.0.6 regressions for numeric/date-like bare keys, numeric dotted paths, table-name components, multiline-key rejection, required line boundaries, and key serialization round trips;
 - v1.1.0 coverage for `\e` and `\xHH` escapes, optional seconds (including serialization with seconds), multi-line inline tables with comments and trailing commas, table redefinition rules (rejected and valid forms), multiline-string quote runs, bare carriage returns, invalid UTF-8 and byte order marks, `Int64` boundaries, `[[array]]` bracket adjacency, a local date before a comment, and DEL escaping in the serializer.
 
-The Debug build runs with `heaptrc`; the release gate requires 94 tests, zero errors, zero failures, and zero unfreed blocks. CI enforces the leak check on Linux and Windows. The v1.1.0 local gate used Lazarus 4.8 and FPC 3.2.2.
+The Debug build runs with `heaptrc`; the release gate requires 94 tests, zero errors, zero failures, and zero unfreed blocks. CI enforces the leak check on Windows, and on Linux whenever heaptrc prints its report. The v1.1.0 local gate used Lazarus 4.8 and FPC 3.2.2.
 
 ## Official conformance suite
 
