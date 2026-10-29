@@ -60,6 +60,7 @@
             <Filename Value="DottedKeysDemo"/>
           </Target>
           <SearchPaths>
+            <OtherUnitFiles Value="..\..\src"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <CodeGeneration>
@@ -100,6 +101,7 @@
       <Filename Value="DottedKeysDemo"/>
     </Target>
     <SearchPaths>
+      <OtherUnitFiles Value="..\..\src"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
   </CompilerOptions>
