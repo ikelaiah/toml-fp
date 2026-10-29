@@ -11,5 +11,5 @@ while IFS= read -r test_name; do
   skip_arguments+=("-skip=$test_name")
 done < "$known_failures"
 
-"$toml_test" test -toml 1.0 -skip-must-err \
-  "${skip_arguments[@]}" -decoder "$decoder" -color never
+"$toml_test" test -toml 1.1 -skip-must-err \
+  ${skip_arguments[@]+"${skip_arguments[@]}"} -decoder "$decoder" -color never

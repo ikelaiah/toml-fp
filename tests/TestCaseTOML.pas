@@ -9,6 +9,11 @@ uses
 
 type
   TTOMLTestCase = class(TTestCase)
+  private
+    { Fails the test unless parsing the document raises ETOMLParserException }
+    procedure AssertRejected(const ADocument: string);
+    { Joins lines with LineEnding, terminating the last one too }
+    function Join(const ALines: array of string): string;
   published
     { Basic Types Tests }
     procedure Test01_StringValue;
@@ -55,7 +60,7 @@ type
     procedure Test43_InvalidTableKey;
     procedure Test44_DuplicateKey;
     
-    { TOML v1.0.0 Specification Tests }
+    { TOML Specification Tests }
     procedure Test50_MultilineString;
     procedure Test50_1_UnicodeEscapeSequences;
     procedure Test50_2_BasicStringAdditionalEscapes;
@@ -76,7 +81,7 @@ type
     procedure Test59_ArrayOfTables;
     procedure Test60_DottedTableArray;
     
-    { Additional TOML v1.0.0 Specification Tests }
+    { Additional TOML Specification Tests }
     procedure Test61_PositiveInf;
     procedure Test61_NegativeInf;
     procedure Test61_NotANumber;
@@ -105,6 +110,20 @@ type
     procedure Test82_RejectMultilineKeys;
     procedure Test83_RejectMissingKeyValueLineBreak;
     procedure Test84_KeySerializationRoundTrip;
+
+    { TOML 1.1.0 and conformance hardening tests }
+    procedure Test85_EscapeAndHexEscapes;
+    procedure Test86_OptionalSeconds;
+    procedure Test87_LocalDateBeforeComment;
+    procedure Test88_InlineTableNewlinesAndTrailingComma;
+    procedure Test89_TableRedefinitionRejected;
+    procedure Test90_TableDefinitionValidForms;
+    procedure Test91_MultilineStringQuoteRuns;
+    procedure Test92_BareCarriageReturnRejected;
+    procedure Test93_RejectInvalidUTF8;
+    procedure Test94_Int64Boundaries;
+    procedure Test95_ArrayOfTablesBracketsMustBeAdjacent;
+    procedure Test96_SerializerEscapesDelete;
   end;
 
 implementation
@@ -2050,6 +2069,364 @@ begin
       AssertTrue('Round-trip literal dotted key exists',
         Value.AsTable.TryGetValue('dotted.key', Value));
       AssertEquals('Round-trip literal dotted key value', 42, Value.AsInteger);
+    finally
+      RoundTrip.Free;
+    end;
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.AssertRejected(const ADocument: string);
+var
+  Doc: TTOMLTable;
+begin
+  Doc := nil;
+  try
+    Doc := ParseTOML(ADocument);
+    FreeAndNil(Doc);
+    Fail('Invalid document was accepted: ' + ADocument);
+  except
+    on E: ETOMLParserException do
+      ; // expected
+  end;
+end;
+
+function TTOMLTestCase.Join(const ALines: array of string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := Low(ALines) to High(ALines) do
+    Result := Result + ALines[I] + LineEnding;
+end;
+
+procedure TTOMLTestCase.Test85_EscapeAndHexEscapes;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(Join([
+    'esc = "\e[0m"',
+    'hex = "\x41\x7a\xe9\x00"',
+    'multi = """',
+    '\x20\e\x41"""',
+    'literal = ''\e\x41''']));
+  try
+    AssertTrue('esc exists', Doc.TryGetValue('esc', Value));
+    AssertEquals('\e is U+001B', #27'[0m', Value.AsString);
+    AssertTrue('hex exists', Doc.TryGetValue('hex', Value));
+    AssertEquals('\xHH maps to U+00HH', 'Az'#$C3#$A9#0, Value.AsString);
+    AssertTrue('multi exists', Doc.TryGetValue('multi', Value));
+    AssertEquals('Escapes work in multiline basic strings', ' '#27'A', Value.AsString);
+    AssertTrue('literal exists', Doc.TryGetValue('literal', Value));
+    AssertEquals('Literal strings keep escapes verbatim', '\e\x41', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+
+  AssertRejected('s = "\x4"');
+  AssertRejected('s = "\xZZ"');
+  AssertRejected('s = "\X41"');
+  AssertRejected('s = "\E"');
+end;
+
+procedure TTOMLTestCase.Test86_OptionalSeconds;
+var
+  Doc, RoundTrip: TTOMLTable;
+  Value: TTOMLValue;
+  Serialized: string;
+begin
+  Doc := ParseTOML(Join([
+    'lt = 07:32',
+    'ldt = 1979-05-27T07:32',
+    'odt = 1979-05-27 07:32Z',
+    'odt2 = 1979-05-27 07:32-07:00',
+    'full = 07:32:15.5']));
+  try
+    AssertTrue('lt exists', Doc.TryGetValue('lt', Value));
+    AssertTrue('lt is a local time', TTOMLDateTime(Value).Kind = tdtLocalTime);
+    AssertEquals('lt value', '07:32:00', FormatDateTime('hh:nn:ss', Value.AsDateTime));
+    AssertTrue('ldt exists', Doc.TryGetValue('ldt', Value));
+    AssertTrue('ldt is a local datetime', TTOMLDateTime(Value).Kind = tdtLocalDateTime);
+    AssertTrue('odt exists', Doc.TryGetValue('odt', Value));
+    AssertTrue('odt is an offset datetime', TTOMLDateTime(Value).Kind = tdtOffsetDateTime);
+    AssertTrue('odt2 exists', Doc.TryGetValue('odt2', Value));
+    AssertTrue('odt2 is an offset datetime', TTOMLDateTime(Value).Kind = tdtOffsetDateTime);
+    AssertTrue('full exists', Doc.TryGetValue('full', Value));
+    AssertEquals('Seconds are still parsed', '07:32:15',
+      FormatDateTime('hh:nn:ss', Value.AsDateTime));
+
+    // Output always carries seconds so TOML 1.0 readers accept it.
+    Serialized := SerializeTOML(Doc);
+    AssertTrue('Serialized local time has seconds', Pos('lt = 07:32:00', Serialized) > 0);
+    AssertTrue('Serialized local datetime has seconds',
+      Pos('ldt = 1979-05-27T07:32:00', Serialized) > 0);
+    AssertTrue('Serialized offset datetime has seconds',
+      Pos('odt = 1979-05-27T07:32:00Z', Serialized) > 0);
+    AssertTrue('Serialized offset datetime keeps its offset',
+      Pos('odt2 = 1979-05-27T07:32:00-07:00', Serialized) > 0);
+    RoundTrip := ParseTOML(Serialized);
+    RoundTrip.Free;
+  finally
+    Doc.Free;
+  end;
+
+  AssertRejected('t = 07:32.5');
+  AssertRejected('t = 07:');
+  AssertRejected('t = 07:32:');
+  AssertRejected('t = 1979-05-27T07:32.5');
+end;
+
+procedure TTOMLTestCase.Test87_LocalDateBeforeComment;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(Join([
+    'd = 1979-05-27 # Comment',
+    'a = [1979-05-27 ]']));
+  try
+    AssertTrue('d exists', Doc.TryGetValue('d', Value));
+    AssertTrue('d is a local date', TTOMLDateTime(Value).Kind = tdtLocalDate);
+    AssertTrue('a exists', Doc.TryGetValue('a', Value));
+    AssertEquals('Array holds the date', 1, Value.AsArray.Count);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test88_InlineTableNewlinesAndTrailingComma;
+var
+  Doc: TTOMLTable;
+  Value, Inner: TTOMLValue;
+begin
+  Doc := ParseTOML(Join([
+    'trailing = { a = 1, }',
+    'empty = {',
+    '}',
+    'person = { # leading comment',
+    '  name = "Ada", # after value',
+    '  tags = [',
+    '    "x",',
+    '    "y",',
+    '  ],',
+    '  address = {',
+    '    city = "London",',
+    '  },',
+    '  dotted.key = true',
+    '  , last = 1',
+    '}',
+    'after = 5',
+    'list = [ { n = 1, }, { n = 2,',
+    '} ]']));
+  try
+    AssertTrue('trailing exists', Doc.TryGetValue('trailing', Value));
+    AssertEquals('Trailing comma keeps the entry', 1, Value.AsTable.Items.Count);
+    AssertTrue('empty exists', Doc.TryGetValue('empty', Value));
+    AssertEquals('Empty multi-line inline table', 0, Value.AsTable.Items.Count);
+    AssertTrue('person exists', Doc.TryGetValue('person', Value));
+    AssertEquals('person entries', 5, Value.AsTable.Items.Count);
+    AssertTrue('name exists', Value.AsTable.TryGetValue('name', Inner));
+    AssertEquals('name value', 'Ada', Inner.AsString);
+    AssertTrue('tags exists', Value.AsTable.TryGetValue('tags', Inner));
+    AssertEquals('tags count', 2, Inner.AsArray.Count);
+    AssertTrue('address exists', Value.AsTable.TryGetValue('address', Inner));
+    AssertTrue('city exists', Inner.AsTable.TryGetValue('city', Inner));
+    AssertEquals('city value', 'London', Inner.AsString);
+    AssertTrue('Key after the table is still parsed', Doc.TryGetValue('after', Value));
+    AssertEquals('after value', 5, Value.AsInteger);
+    AssertTrue('list exists', Doc.TryGetValue('list', Value));
+    AssertEquals('Inline tables in arrays', 2, Value.AsArray.Count);
+  finally
+    Doc.Free;
+  end;
+
+  AssertRejected('t = { , }');
+  AssertRejected('t = { a = 1,, }');
+  AssertRejected('t = { a = 1 b = 2 }');
+  AssertRejected('t = { a = 1');
+  AssertRejected('t = { a = }');
+end;
+
+procedure TTOMLTestCase.Test89_TableRedefinitionRejected;
+begin
+  AssertRejected(Join(['[a]', 'b = 1', '[a]', 'c = 2']));
+  AssertRejected(Join(['[a.b]', '[a]', '[a]']));
+  AssertRejected(Join(['[a]', 'b.c = 1', '[a.b]']));
+  AssertRejected(Join(['[fruit]', 'apple.color = "red"', '[fruit.apple]']));
+  AssertRejected(Join(['[fruit]', 'apple.taste.sweet = true', '[fruit.apple.taste]']));
+  AssertRejected(Join(['a = {}', '[a.b]']));
+  AssertRejected(Join(['a = { b = 1 }', '[a]']));
+  AssertRejected(Join(['a = [{ b = 1 }]', '[a.c]']));
+  AssertRejected(Join(['a = [{ b = 1 }]', '[[a]]']));
+  AssertRejected(Join(['a = [1]', '[a]']));
+  AssertRejected(Join(['[[a]]', '[a]']));
+  AssertRejected(Join(['[a]', 'b = 1', '[a.b]']));
+  AssertRejected(Join(['[product]', 'type = { name = "Nail" }', 'type.edible = false']));
+  AssertRejected(Join(['a.b = 1', 'a.b.c = 2']));
+  AssertRejected(Join(['[a]', 'b.c = 1', '[x]', '[a]']));
+  AssertRejected(Join(['[a]', 'x.y = 1', '[[b]]', '[a]']));
+  AssertRejected(Join(['a = { b.c = 1, b = 2 }']));
+end;
+
+procedure TTOMLTestCase.Test90_TableDefinitionValidForms;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  // A super-table may be defined after its sub-tables.
+  Doc := ParseTOML(Join(['[a.b.c]', 'x = 1', '[a]', 'y = 2', '[a.b]', 'z = 3']));
+  try
+    AssertTrue('a exists', Doc.TryGetValue('a', Value));
+    AssertEquals('a has y and b', 2, Value.AsTable.Items.Count);
+  finally
+    Doc.Free;
+  end;
+
+  // Sub-tables and arrays of tables may hang off a dotted-key table.
+  Doc := ParseTOML(Join([
+    '[fruit]', 'apple.color = "red"', 'apple.taste.sweet = true',
+    '[fruit.apple.texture]', 'smooth = true',
+    '[[fruit.apple.seeds]]', 'size = 2',
+    '[[fruit.apple.seeds]]', 'size = 3']));
+  try
+    AssertTrue('fruit exists', Doc.TryGetValue('fruit', Value));
+    AssertTrue('apple exists', Value.AsTable.TryGetValue('apple', Value));
+    AssertEquals('apple members', 4, Value.AsTable.Items.Count);
+  finally
+    Doc.Free;
+  end;
+
+  // Dotted keys may keep extending their own table within one section.
+  Doc := ParseTOML(Join(['a.b.c = 1', 'a.b.d = 2', 'a.e = 3', '[t]', 'a.b = 1']));
+  try
+    AssertTrue('a exists', Doc.TryGetValue('a', Value));
+    AssertEquals('a members', 2, Value.AsTable.Items.Count);
+  finally
+    Doc.Free;
+  end;
+
+  // Every [[array]] element starts with a clean slate.
+  Doc := ParseTOML(Join([
+    '[[a]]', 'x.y = 1', '[a.sub]', 'k = 1',
+    '[[a]]', 'x.y = 2', '[a.sub]', 'k = 2']));
+  try
+    AssertTrue('a exists', Doc.TryGetValue('a', Value));
+    AssertEquals('Two array elements', 2, Value.AsArray.Count);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test91_MultilineStringQuoteRuns;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(Join([
+    'one = """"one quote""""',
+    'two = """""two quotes"""""',
+    'lit_one = ''''''''one quote''''''''',
+    'lit_two = ''''''''''two quotes''''''''''',
+    'mix = """ ""x"" """']));
+  try
+    AssertTrue('one exists', Doc.TryGetValue('one', Value));
+    AssertEquals('one', '"one quote"', Value.AsString);
+    AssertTrue('two exists', Doc.TryGetValue('two', Value));
+    AssertEquals('two', '""two quotes""', Value.AsString);
+    AssertTrue('lit_one exists', Doc.TryGetValue('lit_one', Value));
+    AssertEquals('lit_one', '''one quote''', Value.AsString);
+    AssertTrue('lit_two exists', Doc.TryGetValue('lit_two', Value));
+    AssertEquals('lit_two', '''''two quotes''''', Value.AsString);
+    AssertTrue('mix exists', Doc.TryGetValue('mix', Value));
+    AssertEquals('mix', ' ""x"" ', Value.AsString);
+  finally
+    Doc.Free;
+  end;
+
+  AssertRejected('s = """a""""""');
+  AssertRejected('s = """a"""""""');
+end;
+
+procedure TTOMLTestCase.Test92_BareCarriageReturnRejected;
+begin
+  AssertRejected('s = """a' + #13 + 'b"""');
+  AssertRejected('s = ''''''a' + #13 + 'b''''''');
+  AssertRejected('s = """a \' + #13 + 'b"""');
+  AssertRejected('# comment' + #13 + 'a = 1');
+end;
+
+procedure TTOMLTestCase.Test93_RejectInvalidUTF8;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  AssertRejected('s = "' + #$C3 + '"');                 // truncated sequence
+  AssertRejected('s = "' + #$80 + '"');                  // stray continuation byte
+  AssertRejected('s = "' + #$C0#$AF + '"');              // overlong
+  AssertRejected('s = "' + #$ED#$A0#$80 + '"');          // UTF-16 surrogate
+  AssertRejected('s = "' + #$F4#$90#$80#$80 + '"');      // above U+10FFFF
+  AssertRejected('# ' + #$FF + LineEnding + 'a = 1');    // invalid byte in comment
+
+  // Well-formed UTF-8, with and without a byte order mark.
+  Doc := ParseTOML(#$EF#$BB#$BF + 's = "' + #$C3#$A9#$E2#$82#$AC#$F0#$9F#$98#$80 + '"');
+  try
+    AssertTrue('s exists', Doc.TryGetValue('s', Value));
+    AssertEquals('UTF-8 value', #$C3#$A9#$E2#$82#$AC#$F0#$9F#$98#$80, Value.AsString);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test94_Int64Boundaries;
+var
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(Join([
+    'max = 9223372036854775807',
+    'min = -9223372036854775808',
+    'neg = -42',
+    'pos = +42']));
+  try
+    AssertTrue('max exists', Doc.TryGetValue('max', Value));
+    AssertEquals('max', High(Int64), Value.AsInteger);
+    AssertTrue('min exists', Doc.TryGetValue('min', Value));
+    AssertEquals('min', Low(Int64), Value.AsInteger);
+    AssertTrue('neg exists', Doc.TryGetValue('neg', Value));
+    AssertEquals('neg', -42, Value.AsInteger);
+    AssertTrue('pos exists', Doc.TryGetValue('pos', Value));
+    AssertEquals('pos', 42, Value.AsInteger);
+  finally
+    Doc.Free;
+  end;
+
+  AssertRejected('i = 9223372036854775808');
+  AssertRejected('i = -9223372036854775809');
+end;
+
+procedure TTOMLTestCase.Test95_ArrayOfTablesBracketsMustBeAdjacent;
+begin
+  AssertRejected(Join(['[ [table]]', 'a = 1']));
+  AssertRejected(Join(['[[table] ]', 'a = 1']));
+end;
+
+procedure TTOMLTestCase.Test96_SerializerEscapesDelete;
+var
+  Doc, RoundTrip: TTOMLTable;
+  Serialized: string;
+  Value: TTOMLValue;
+begin
+  Doc := ParseTOML(Join(['s = "a\x7fb"', '"k\x7f" = 1']));
+  try
+    Serialized := SerializeTOML(Doc);
+    AssertEquals('DEL is never written raw', 0, Pos(#127, Serialized));
+    RoundTrip := ParseTOML(Serialized);
+    try
+      AssertTrue('s survives', RoundTrip.TryGetValue('s', Value));
+      AssertEquals('s value', 'a'#127'b', Value.AsString);
+      AssertTrue('key survives', RoundTrip.TryGetValue('k'#127, Value));
     finally
       RoundTrip.Free;
     end;

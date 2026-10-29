@@ -2,7 +2,7 @@
   This is the main unit of the TOML library that provides high-level functionality for working with TOML data.
   It re-exports the main types and provides helper functions for parsing and serializing TOML data.
   
-  The unit follows the TOML v1.0.0 specification and provides a clean, type-safe interface for:
+  The unit follows the TOML v1.1.0 specification and provides a clean, type-safe interface for:
   - Parsing TOML from strings and files
   - Serializing TOML data structures to strings and files
   - Creating and manipulating TOML data structures

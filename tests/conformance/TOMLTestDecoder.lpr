@@ -64,7 +64,7 @@ end;
 
 function DateTimeValueToString(const AValue: TTOMLDateTime): string;
 var
-  DotPosition, FractionEnd, FractionLength: Integer;
+  DotPosition, FractionEnd, FractionLength, TimeStart: Integer;
   Fraction: string;
 begin
   if AValue.RawValue = '' then
@@ -87,6 +87,15 @@ begin
     Result[11] := 'T';
   if (Result <> '') and (Result[Length(Result)] = 'z') then
     Result[Length(Result)] := 'Z';
+
+  // TOML 1.1 allows omitting seconds; the expected JSON always carries them.
+  if AValue.Kind = tdtLocalTime then
+    TimeStart := 1
+  else
+    TimeStart := 12;
+  if AValue.Kind <> tdtLocalDate then
+    if (Length(Result) < TimeStart + 5) or (Result[TimeStart + 5] <> ':') then
+      Insert(':00', Result, TimeStart + 5);
 
   DotPosition := Pos('.', Result);
   if DotPosition > 0 then

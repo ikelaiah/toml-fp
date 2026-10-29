@@ -1,38 +1,5 @@
-# TOML 1.0 valid cases not yet supported (6)
-valid/comment/everywhere
-valid/integer/long
-valid/spec-1.0.0/string-4
-valid/spec-1.0.0/string-7
-valid/string/multiline-quotes
-valid/string/raw-multiline
-
-# TOML 1.0 invalid cases not yet rejected (29)
-invalid/array/extending-table
-invalid/array/tables-01
-invalid/encoding/bad-codepoint
-invalid/encoding/bad-utf8-in-comment
-invalid/encoding/bad-utf8-in-multiline
-invalid/encoding/bad-utf8-in-multiline-literal
-invalid/encoding/bad-utf8-in-string
-invalid/encoding/bad-utf8-in-string-literal
-invalid/inline-table/duplicate-key-03
-invalid/inline-table/overwrite-02
-invalid/inline-table/overwrite-05
-invalid/inline-table/overwrite-08
-invalid/spec-1.0.0/inline-table-2-0
-invalid/spec-1.0.0/table-9-0
-invalid/spec-1.0.0/table-9-1
-invalid/table/append-with-dotted-keys-01
-invalid/table/append-with-dotted-keys-02
-invalid/table/append-with-dotted-keys-04
-invalid/table/append-with-dotted-keys-08
-invalid/table/duplicate-key-01
-invalid/table/duplicate-key-04
-invalid/table/duplicate-key-05
-invalid/table/duplicate-key-07
-invalid/table/duplicate-key-09
-invalid/table/llbrace
-invalid/table/redefine-02
-invalid/table/redefine-03
-invalid/table/rrbrace
-invalid/table/super-twice
+# TOML 1.1 cases not yet supported.
+#
+# One test name per line (for example valid/some/case). Every listed case is
+# skipped by the gate, and CI fails when a listed case starts passing so stale
+# exclusions get removed. The v1.1.0 baseline has no known gaps.

@@ -6,7 +6,7 @@
   - Type conversion and validation
   - Memory management for TOML data structures
   
-  The type system follows the TOML v1.0.0 specification and ensures type safety through
+  The type system follows the TOML v1.1.0 specification and ensures type safety through
   runtime checks and explicit type conversions.
 }
 unit TOML.Types;
@@ -34,7 +34,7 @@ type
     tvtInlineTable  // Inline table value type (compact table representation)
   );
 
-  { Distinguishes the four date/time types defined by TOML 1.0. }
+  { Distinguishes the four date/time types defined by TOML 1.0 and 1.1. }
   TTOMLDateTimeKind = (
     tdtOffsetDateTime,
     tdtLocalDateTime,

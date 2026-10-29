@@ -1,7 +1,7 @@
 { TOML.Serializer.pas
   This unit implements serialization of TOML data structures to text format.
   It handles converting TOML objects into properly formatted TOML text that follows
-  the TOML v1.0.0 specification.
+  the TOML v1.1.0 specification.
 
   The serializer supports all TOML data types and features:
   - Basic key/value pairs with proper quoting and escaping
@@ -33,7 +33,7 @@ type
 
   { TOML serializer class that converts TOML data to text format
     This class handles the conversion of TOML data structures into properly
-    formatted TOML text, following the TOML v1.0.0 specification }
+    formatted TOML text, following the TOML v1.1.0 specification }
   TTOMLSerializer = class
   private
     FStringBuilder: TStringBuilder;  // StringBuilder for efficient string building
@@ -229,7 +229,7 @@ begin
       '"': Result := Result + '\"';
       '\': Result := Result + '\\';
       else
-        if C < #32 then
+        if (C < #32) or (C = #127) then
           Result := Result + Format('\u%.4x', [Ord(C)])
         else
           Result := Result + C;
@@ -260,7 +260,7 @@ begin
       '"': FStringBuilder.Append('\"');   // Quote
       '\': FStringBuilder.Append('\\');   // Backslash
       else
-        if C < #32 then
+        if (C < #32) or (C = #127) then
           // Control characters as unicode escapes
           FStringBuilder.AppendFormat('\u%.4x', [Ord(C)])
         else
@@ -273,6 +273,7 @@ end;
 procedure TTOMLSerializer.WriteDateTime(const ADateTime: TTOMLDateTime);
 var
   Text: string;
+  TimeStart: Integer;
 begin
   if ADateTime.RawValue <> '' then
   begin
@@ -281,6 +282,14 @@ begin
       Text[11] := 'T';
     if (Text <> '') and (Text[Length(Text)] = 'z') then
       Text[Length(Text)] := 'Z';
+    // TOML 1.1 allows omitting seconds; write them so TOML 1.0 readers accept the output.
+    if ADateTime.Kind = tdtLocalTime then
+      TimeStart := 1
+    else
+      TimeStart := 12;
+    if ADateTime.Kind <> tdtLocalDate then
+      if (Length(Text) < TimeStart + 5) or (Text[TimeStart + 5] <> ':') then
+        Insert(':00', Text, TimeStart + 5);
     FStringBuilder.Append(Text);
     Exit;
   end;
