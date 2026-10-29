@@ -56,14 +56,25 @@ fi
 # Published test count must match the test methods declared in the suite.
 test_count=$(tr -d '\r' < tests/TestCaseTOML.pas | grep -c -E '^    procedure Test[0-9]')
 echo "Project tests: $test_count"
-for file in README.md docs/Test-Coverage-Overview.md; do
-  mentioned=$(grep -o -E '[0-9]+ (project )?tests' "$file" | grep -o -E '^[0-9]+' | sort -u || true)
-  for count in $mentioned; do
-    if [[ "$count" != "$test_count" ]]; then
-      fail "$file mentions $count tests but the suite declares $test_count"
+
+# Reports every test count that a text mentions ("94 tests", "94 Debug tests",
+# "N:94", "Number of run tests: 94") and fails when it differs from the suite.
+check_counts() {
+  local label=$1 count
+  while read -r count; do
+    if [[ -n "$count" && "$count" != "$test_count" ]]; then
+      fail "$label mentions $count tests but the suite declares $test_count"
     fi
-  done
+  done < <(grep -o -E '[0-9]+ ([A-Za-z]+ )?tests|N:[0-9]+|run tests: [0-9]+' \
+    | grep -o -E '[0-9]+' | sort -u)
+}
+
+for file in README.md docs/Test-Coverage-Overview.md \
+    "docs/Release-Notes-v${version}.md" "docs/Release-Checklist-v${version}.md"; do
+  [[ -f "$file" ]] && check_counts "$file" < "$file"
 done
+# Older changelog entries legitimately cite older counts; check only the newest.
+tr -d '\r' < CHANGELOG.md | awk '/^### v/{n++} n==1' | check_counts "newest CHANGELOG entry"
 
 # Compiled output must never be tracked.
 tracked_artifacts=$(git ls-files | grep -E '\.(exe|o|ppu|a|dll|so|dylib|dbg|compiled|lps)$' || true)

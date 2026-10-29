@@ -271,39 +271,8 @@ begin
 end;
 
 procedure TTOMLSerializer.WriteDateTime(const ADateTime: TTOMLDateTime);
-var
-  Text: string;
-  TimeStart: Integer;
 begin
-  if ADateTime.RawValue <> '' then
-  begin
-    Text := ADateTime.RawValue;
-    if (Length(Text) >= 11) and (Text[11] in [' ', 't']) then
-      Text[11] := 'T';
-    if (Text <> '') and (Text[Length(Text)] = 'z') then
-      Text[Length(Text)] := 'Z';
-    // TOML 1.1 allows omitting seconds; write them so TOML 1.0 readers accept the output.
-    if ADateTime.Kind = tdtLocalTime then
-      TimeStart := 1
-    else
-      TimeStart := 12;
-    if ADateTime.Kind <> tdtLocalDate then
-      if (Length(Text) < TimeStart + 5) or (Text[TimeStart + 5] <> ':') then
-        Insert(':00', Text, TimeStart + 5);
-    FStringBuilder.Append(Text);
-    Exit;
-  end;
-
-  case ADateTime.Kind of
-    tdtOffsetDateTime:
-      FStringBuilder.Append(FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz"Z"', ADateTime.Value));
-    tdtLocalDateTime:
-      FStringBuilder.Append(FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz', ADateTime.Value));
-    tdtLocalDate:
-      FStringBuilder.Append(FormatDateTime('yyyy-mm-dd', ADateTime.Value));
-    tdtLocalTime:
-      FStringBuilder.Append(FormatDateTime('hh:nn:ss.zzz', ADateTime.Value));
-  end;
+  FStringBuilder.Append(ADateTime.CanonicalText);
 end;
 
 procedure TTOMLSerializer.WriteArray(const AArray: TTOMLArray);

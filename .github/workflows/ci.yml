@@ -111,7 +111,8 @@ jobs:
           exe=./tests/TestRunner
           if [ "$RUNNER_OS" = Windows ]; then exe=./tests/TestRunner.exe; fi
           "$exe" --all --format=plain 2>&1 | tee debug-tests.log
-          grep --quiet "0 unfreed memory blocks" debug-tests.log
+          # heaptrc prints "N unfreed memory blocks"; match a zero count exactly.
+          grep --quiet --extended-regexp "^0 unfreed memory blocks" debug-tests.log
 
       - name: Build release tests from scratch
         run: lazbuild --build-all --build-mode=Release tests/TestRunner.lpi
@@ -214,6 +215,11 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Require the tagged commit to be on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
 
       - name: Verify tag matches package metadata
         run: bash scripts/check-release-metadata.sh "$GITHUB_REF_NAME"

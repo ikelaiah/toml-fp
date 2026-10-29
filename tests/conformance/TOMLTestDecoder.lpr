@@ -64,39 +64,12 @@ end;
 
 function DateTimeValueToString(const AValue: TTOMLDateTime): string;
 var
-  DotPosition, FractionEnd, FractionLength, TimeStart: Integer;
+  DotPosition, FractionEnd, FractionLength: Integer;
   Fraction: string;
 begin
-  if AValue.RawValue = '' then
-  begin
-    case AValue.Kind of
-      tdtOffsetDateTime:
-        Result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz"Z"', AValue.Value);
-      tdtLocalDateTime:
-        Result := FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz', AValue.Value);
-      tdtLocalDate:
-        Result := FormatDateTime('yyyy-mm-dd', AValue.Value);
-      tdtLocalTime:
-        Result := FormatDateTime('hh:nn:ss.zzz', AValue.Value);
-    end;
-    Exit;
-  end;
+  Result := AValue.CanonicalText;
 
-  Result := AValue.RawValue;
-  if (Length(Result) >= 11) and (Result[11] in [' ', 't']) then
-    Result[11] := 'T';
-  if (Result <> '') and (Result[Length(Result)] = 'z') then
-    Result[Length(Result)] := 'Z';
-
-  // TOML 1.1 allows omitting seconds; the expected JSON always carries them.
-  if AValue.Kind = tdtLocalTime then
-    TimeStart := 1
-  else
-    TimeStart := 12;
-  if AValue.Kind <> tdtLocalDate then
-    if (Length(Result) < TimeStart + 5) or (Result[TimeStart + 5] <> ':') then
-      Insert(':00', Result, TimeStart + 5);
-
+  // The expected JSON always carries exactly three fractional digits.
   DotPosition := Pos('.', Result);
   if DotPosition > 0 then
   begin

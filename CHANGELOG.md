@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rejected input that is not valid UTF-8 and skipped a leading UTF-8 byte order mark.
 - Rejected bare carriage returns in strings; accepted three to five closing quotes in multiline strings (for example `""""quoted""""`).
 - Fixed a local date followed by a space and a comment losing its date, and added support for the `Int64` minimum value.
-- Serializer: DEL (`U+007F`) is now escaped in strings and keys, and date/time values are always written with seconds so TOML 1.0 parsers can read the output.
+- Serializer: DEL (`U+007F`) is now escaped in strings and keys, and date/time values are always written with seconds so TOML 1.0 parsers can read the output. Added `TTOMLDateTime.CanonicalText` for the normalized text.
 - Moved the pinned `toml-test` v2.2.0 gate to the TOML 1.1 profile. It passes 214/214 valid and 467/467 invalid decoder cases, and `known-failures.txt` is now empty (it was 35 guarded gaps).
 - Expanded the project suite from 82 to 94 tests.
 - CI: added a Debug heap-leak check, example builds on Linux and Windows, a release-metadata consistency check (`scripts/check-release-metadata.sh`), a tag-driven GitHub release job, and Dependabot updates for pinned actions.

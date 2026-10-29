@@ -47,5 +47,5 @@ Version 1.1.0 moves TOML-FP from TOML 1.0 to [TOML 1.1.0](https://toml.io/en/v1.
 
 - Minimum supported compiler: Free Pascal 3.2.2.
 - Minimum and tested IDE: Lazarus 4.8.
-- No public API changes. `TToken` in `TOML.Parser` gained a `SpaceBefore` field, which only matters to code that drives the lexer directly.
+- Two small additions, no breaking API changes: `TTOMLDateTime.CanonicalText` returns the normalized RFC 3339 text used by the serializer, and `TToken` in `TOML.Parser` gained a `SpaceBefore` field, which only matters to code that drives the lexer directly.
 - Documents that earlier versions accepted by silently merging redefined tables, or that contain bytes that are not valid UTF-8, now raise `ETOMLParserException`. Both were invalid TOML.
