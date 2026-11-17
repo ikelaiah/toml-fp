@@ -1,22 +1,18 @@
 { TOML.Serializer.pas
-  This unit implements serialization of TOML data structures to text format.
-  It handles converting TOML objects into properly formatted TOML text that follows
-  the TOML v1.1.0 specification.
+  Turns a TTOMLValue tree back into TOML text.
 
-  The serializer supports all TOML data types and features:
-  - Basic key/value pairs with proper quoting and escaping
-  - Tables and inline tables with proper nesting
-  - Arrays with proper formatting and type consistency
-  - Basic strings and literal strings with proper escaping
-  - Numbers in decimal format (integers and floats)
-  - Booleans and dates/times in standard format
-  
-  Key features:
-  - Efficient string building using TStringBuilder
-  - Proper indentation and formatting for readability
-  - Handles nested tables and arrays correctly
-  - Preserves table ordering as per TOML spec
-  - Proper escaping of special characters in strings
+  Output rules:
+  - Keys appear in table insertion order. Within a table, plain key/value
+    pairs come first, then [sub.tables] and [[arrays.of.tables]].
+  - A table that holds only sub-tables gets no header of its own; its
+    children's headers define it (e.g. [server.http] without [server]).
+  - Arrays whose items are all tables become [[headers]]; any other table
+    nested in a value is written as an inline table.
+  - Arrays stay on one line up to MaxLineWidth, then wrap one item per line.
+  - Floats round-trip exactly and always look like floats (1.0, not 1);
+    output never depends on the locale.
+  - Strings use basic quotes with escapes; times always carry seconds, so
+    output stays readable by TOML 1.0 parsers.
 }
 unit TOML.Serializer;
 
@@ -25,98 +21,81 @@ unit TOML.Serializer;
 interface
 
 uses
-  SysUtils, Classes, TOML.Types, Generics.Collections;
+  SysUtils, Classes, TOML.Types;
 
 type
-  { Key-Value pair type for TOML tables }
-  TTOMLKeyValuePair = specialize TPair<string, TTOMLValue>;
+  { Key-Value pair type for TOML tables (alias of the TOML.Types type) }
+  TTOMLKeyValuePair = TOML.Types.TTOMLKeyValuePair;
 
-  { TOML serializer class that converts TOML data to text format
-    This class handles the conversion of TOML data structures into properly
-    formatted TOML text, following the TOML v1.1.0 specification }
+  { Converts TOML values to text. One instance can serialize many values }
   TTOMLSerializer = class
   private
-    FStringBuilder: TStringBuilder;  // StringBuilder for efficient string building
-    FIndentLevel: Integer;           // Current indentation level
-    FCurrentPath: TStringList;       // Tracks current table path for proper nesting
-    
-    { Writes indentation at current level
-      Used to maintain consistent formatting }
-    procedure WriteIndent;
-    
-    { Writes a line with optional content and newline
-      @param ALine Optional string content to write }
-    procedure WriteLine(const ALine: string = '');
-    
-    { Writes a TOML key with proper quoting
-      @param AKey The key to write
-      Handles escaping and quoting of keys as needed }
-    procedure WriteKey(const AKey: string);
-    
-    { Writes a TOML string value with proper escaping
-      @param AValue The string to write
-      Handles all required string escaping per TOML spec }
-    procedure WriteString(const AValue: string);
-    
-    { Writes any TOML value based on its type
-      @param AValue The value to write
-      Dispatches to appropriate write method based on value type }
-    procedure WriteValue(const AValue: TTOMLValue);
-    
-    { Writes a TOML table
-      @param ATable The table to write
-      @param AInline Whether to write as inline table
-      Handles both standard and inline table formats }
-    procedure WriteTable(const ATable: TTOMLTable; const AInline: Boolean = False);
-    
-    { Writes a TOML array
-      @param AArray The array to write
-      Handles arrays of any valid TOML type }
-    procedure WriteArray(const AArray: TTOMLArray);
-    
-    { Writes a TOML datetime value
-      @param ADateTime The datetime to write
-      Formats datetime according to RFC 3339 }
-    procedure WriteDateTime(const ADateTime: TTOMLDateTime);
-    
-    { Checks if a key needs to be quoted
-      @param AKey The key to check
-      @returns True if key needs quoting, False otherwise }
-    function NeedsQuoting(const AKey: string): Boolean;
-    function FormatKey(const AKey: string): string;
+    FBuilder: TStringBuilder;
+
+    { Writes the key/value pairs and sections of a document-level table
+      @param ATable Table to write
+      @param APath Already-formatted dotted path of ATable ('' for root) }
+    procedure WriteTableBody(const ATable: TTOMLTable; const APath: string);
+
+    { Writes a [header] or [[header]] line, preceded by a blank line
+      unless it is the first line of output }
+    procedure WriteHeader(const AHeader: string);
+
+    { Formats a value for use after "key = "
+      @param AValue Value to format
+      @param AIndent Indentation level, for wrapped arrays
+      @param AColumn Column where the value starts, for line-width checks
+      @param AAllowWrap False inside inline tables, which must stay on one line }
+    function FormatValue(const AValue: TTOMLValue; AIndent, AColumn: Integer;
+      AAllowWrap: Boolean): string;
+    function FormatArray(const AArray: TTOMLArray; AIndent, AColumn: Integer;
+      AAllowWrap: Boolean): string;
+    function FormatInlineTable(const ATable: TTOMLTable): string;
   public
-    { Creates a new TOML serializer instance }
     constructor Create;
-    
-    { Cleans up the serializer instance }
     destructor Destroy; override;
-    
-    { Serializes a TOML value to string format
-      @param AValue The value to serialize
-      @returns The serialized TOML string
-      @raises ETOMLSerializerException if value cannot be serialized }
+
+    { Serializes a value. A table becomes a whole TOML document; any other
+      value becomes its inline TOML representation
+      @raises ETOMLSerializerException if the value cannot be serialized }
     function Serialize(const AValue: TTOMLValue): string;
   end;
 
-{ High-level serialization functions }
+const
+  { Arrays longer than this, measured from the start of the line, wrap }
+  MaxLineWidth = 80;
 
 { Serializes a TOML value to string format
-  @param AValue The value to serialize
+  @param AValue The value to serialize (usually the root table)
   @returns The serialized TOML string
   @raises ETOMLSerializerException if value cannot be serialized }
 function SerializeTOML(const AValue: TTOMLValue): string;
 
-{ Serializes a TOML value to a file
+{ Serializes a TOML value to a UTF-8 file, replacing any existing file
   @param AValue The value to serialize
   @param AFileName The output file path
-  @returns True if successful, False otherwise
-  @raises ETOMLSerializerException if value cannot be serialized
-  @raises EFileStreamError if file cannot be written }
+  @returns True if the file was written, False on any error }
 function SerializeTOMLToFile(const AValue: TTOMLValue; const AFileName: string): Boolean;
+
+{ Formats a key, quoting it only when it is not a valid bare key }
+function FormatTOMLKey(const AKey: string): string;
+
+{ Formats a string as a TOML basic string, with escapes }
+function FormatTOMLString(const AValue: string): string;
+
+{ Formats a float so it parses back to the same Double, using TOML
+  spellings for special values (inf, -inf, nan) }
+function FormatTOMLFloat(const AValue: Double): string;
 
 implementation
 
-{ High-level function implementations }
+uses
+  Math;
+
+var
+  InvariantFormat: TFormatSettings;
+
+{ High-level functions }
 
 function SerializeTOML(const AValue: TTOMLValue): string;
 var
@@ -132,347 +111,332 @@ end;
 
 function SerializeTOMLToFile(const AValue: TTOMLValue; const AFileName: string): Boolean;
 var
-  TOML: string;
+  Text: string;
+  Stream: TFileStream;
 begin
   Result := False;
   try
-    TOML := SerializeTOML(AValue);
-    with TStringList.Create do
+    Text := SerializeTOML(AValue);
+    Stream := TFileStream.Create(AFileName, fmCreate);
     try
-      Text := TOML;
-      SaveToFile(AFileName);
+      if Text <> '' then
+        Stream.WriteBuffer(Text[1], Length(Text));
       Result := True;
     finally
-      Free;
+      Stream.Free;
     end;
   except
-    // Return False on any error
+    // The documented contract is a Boolean result, not an exception.
   end;
 end;
 
-{ TTOMLSerializer implementation }
+{ Formatting helpers }
+
+function IsBareKey(const AKey: string): Boolean;
+var
+  C: Char;
+begin
+  if AKey = '' then
+    Exit(False);
+  for C in AKey do
+    if not (C in ['A'..'Z', 'a'..'z', '0'..'9', '_', '-']) then
+      Exit(False);
+  Result := True;
+end;
+
+function FormatTOMLString(const AValue: string): string;
+var
+  Builder: TStringBuilder;
+  C: Char;
+begin
+  Builder := TStringBuilder.Create(Length(AValue) + 2);
+  try
+    Builder.Append('"');
+    for C in AValue do
+      case C of
+        #8:  Builder.Append('\b');
+        #9:  Builder.Append('\t');
+        #10: Builder.Append('\n');
+        #12: Builder.Append('\f');
+        #13: Builder.Append('\r');
+        '"': Builder.Append('\"');
+        '\': Builder.Append('\\');
+        #0..#7, #11, #14..#31, #127:
+          Builder.Append(Format('\u%.4X', [Ord(C)]));
+      else
+        // Bytes >= $80 are UTF-8 sequences and pass through unchanged.
+        Builder.Append(C);
+      end;
+    Builder.Append('"');
+    Result := Builder.ToString;
+  finally
+    Builder.Free;
+  end;
+end;
+
+function FormatTOMLKey(const AKey: string): string;
+begin
+  if IsBareKey(AKey) then
+    Result := AKey
+  else
+    Result := FormatTOMLString(AKey);
+end;
+
+{ Lays out significant digits as positional or scientific notation.
+  The value is 0.<ADigits> * 10^AExponent }
+function LayOutFloat(const ADigits: string; AExponent: Integer;
+  ANegative: Boolean): string;
+var
+  Count: Integer;
+begin
+  Count := Length(ADigits);
+  if (AExponent > 17) or (AExponent < -4) then
+  begin
+    // Scientific: 1.5e-7, 6.02214076e23
+    Result := ADigits[1];
+    if Count > 1 then
+      Result := Result + '.' + Copy(ADigits, 2, MaxInt);
+    Result := Result + 'e' + IntToStr(AExponent - 1);
+  end
+  else if AExponent <= 0 then
+    Result := '0.' + StringOfChar('0', -AExponent) + ADigits
+  else if AExponent >= Count then
+    Result := ADigits + StringOfChar('0', AExponent - Count) + '.0'
+  else
+    Result := Copy(ADigits, 1, AExponent) + '.' + Copy(ADigits, AExponent + 1, MaxInt);
+  if ANegative then
+    Result := '-' + Result;
+end;
+
+function FormatTOMLFloat(const AValue: Double): string;
+var
+  Decimal: TFloatRec;
+  Digits: string;
+  Precision: Integer;
+begin
+  if IsNan(AValue) then
+    Exit('nan');
+  if IsInfinite(AValue) then
+    if AValue > 0 then
+      Exit('inf')
+    else
+      Exit('-inf');
+  if AValue = 0 then
+    if PInt64(@AValue)^ < 0 then
+      Exit('-0.0')
+    else
+      Exit('0.0');
+
+  // Fewest significant digits (at most 17) that read back exactly.
+  // (FloatToStrF caps Double precision at 15 digits, so it cannot be used.)
+  for Precision := 1 to 17 do
+  begin
+    FloatToDecimal(Decimal, AValue, fvDouble, Precision, 9999);
+    Digits := StrPas(@Decimal.Digits[0]);
+    while (Length(Digits) > 1) and (Digits[Length(Digits)] = '0') do
+      SetLength(Digits, Length(Digits) - 1);
+    Result := LayOutFloat(Digits, Decimal.Exponent, Decimal.Negative);
+    if StrToFloat(Result, InvariantFormat) = AValue then
+      Exit;
+  end;
+end;
+
+function IsArrayOfTables(const AValue: TTOMLValue): Boolean;
+var
+  Item: TTOMLValue;
+begin
+  Result := (AValue.ValueType = tvtArray) and (AValue.AsArray.Count > 0);
+  if Result then
+    for Item in AValue.AsArray do
+      if Item.ValueType <> tvtTable then
+        Exit(False);
+end;
+
+{ A value that gets its own [header] or [[header]] section }
+function IsSection(const AValue: TTOMLValue): Boolean;
+begin
+  Result := (AValue.ValueType = tvtTable) or IsArrayOfTables(AValue);
+end;
+
+{ True when a table's headers can be left out because its children define it }
+function IsImplicitTable(const ATable: TTOMLTable): Boolean;
+var
+  Pair: TTOMLKeyValuePair;
+begin
+  if ATable.Count = 0 then
+    Exit(False);
+  for Pair in ATable do
+    if not IsSection(Pair.Value) then
+      Exit(False);
+  Result := True;
+end;
+
+function JoinPath(const APath, AKey: string): string;
+begin
+  if APath = '' then
+    Result := FormatTOMLKey(AKey)
+  else
+    Result := APath + '.' + FormatTOMLKey(AKey);
+end;
+
+{ TTOMLSerializer }
 
 constructor TTOMLSerializer.Create;
 begin
   inherited Create;
-  FStringBuilder := TStringBuilder.Create;
-  FIndentLevel := 0;
-  FCurrentPath := TStringList.Create;
-  FCurrentPath.Delimiter := '.';      // Set delimiter for path joining
-  FCurrentPath.StrictDelimiter := True; // Use strict delimiter handling
+  FBuilder := TStringBuilder.Create;
 end;
 
 destructor TTOMLSerializer.Destroy;
 begin
-  FStringBuilder.Free;
-  FCurrentPath.Free;
-  inherited;
+  FBuilder.Free;
+  inherited Destroy;
 end;
 
-procedure TTOMLSerializer.WriteIndent;
+procedure TTOMLSerializer.WriteHeader(const AHeader: string);
+begin
+  if FBuilder.Length > 0 then
+    FBuilder.Append(LineEnding);
+  FBuilder.Append(AHeader);
+  FBuilder.Append(LineEnding);
+end;
+
+function TTOMLSerializer.FormatInlineTable(const ATable: TTOMLTable): string;
 var
-  i: Integer;
+  Pair: TTOMLKeyValuePair;
 begin
-  for i := 1 to FIndentLevel * 2 do
-    FStringBuilder.Append(' ');
-end;
-
-procedure TTOMLSerializer.WriteLine(const ALine: string = '');
-begin
-  if ALine <> '' then
+  if ATable.Count = 0 then
+    Exit('{}');
+  Result := '';
+  for Pair in ATable do
   begin
-    WriteIndent;
-    FStringBuilder.Append(ALine);
+    if Result <> '' then
+      Result := Result + ', ';
+    Result := Result + FormatTOMLKey(Pair.Key) + ' = ' +
+      FormatValue(Pair.Value, 0, 0, False);
   end;
-  FStringBuilder.AppendLine;
+  Result := '{ ' + Result + ' }';
 end;
 
-function TTOMLSerializer.NeedsQuoting(const AKey: string): Boolean;
+function TTOMLSerializer.FormatArray(const AArray: TTOMLArray;
+  AIndent, AColumn: Integer; AAllowWrap: Boolean): string;
 var
-  i: Integer;
-  C: Char;
+  Items: array of string;
+  i, Width: Integer;
+  Wrap: Boolean;
+  Pad: string;
 begin
-  // Empty keys need quoting
-  if AKey = '' then
-    Exit(True);
-    
-  // Check all characters - must be letter, number, underscore or dash
-  for i := 1 to Length(AKey) do
-  begin
-    C := AKey[i];
-    if not ((C in ['A'..'Z']) or (C in ['a'..'z']) or 
-            (C in ['0'..'9']) or (C = '_') or (C = '-')) then
-      Exit(True);
-  end;
-  
-  Result := False;
-end;
+  if AArray.Count = 0 then
+    Exit('[]');
 
-function TTOMLSerializer.FormatKey(const AKey: string): string;
-var
-  i: Integer;
-  C: Char;
-begin
-  if not NeedsQuoting(AKey) then
-    Exit(AKey);
-
-  Result := '"';
-  for i := 1 to Length(AKey) do
-  begin
-    C := AKey[i];
-    case C of
-      #8:  Result := Result + '\b';
-      #9:  Result := Result + '\t';
-      #10: Result := Result + '\n';
-      #12: Result := Result + '\f';
-      #13: Result := Result + '\r';
-      '"': Result := Result + '\"';
-      '\': Result := Result + '\\';
-      else
-        if (C < #32) or (C = #127) then
-          Result := Result + Format('\u%.4x', [Ord(C)])
-        else
-          Result := Result + C;
-    end;
-  end;
-  Result := Result + '"';
-end;
-
-procedure TTOMLSerializer.WriteKey(const AKey: string);
-begin
-  FStringBuilder.Append(FormatKey(AKey));
-end;
-
-procedure TTOMLSerializer.WriteString(const AValue: string);
-var
-  i: Integer;
-  C: Char;
-begin
-  FStringBuilder.Append('"');
-  for i := 1 to Length(AValue) do
-  begin
-    C := AValue[i];
-    case C of
-      #8:  FStringBuilder.Append('\b');   // Backspace
-      #9:  FStringBuilder.Append('\t');   // Tab
-      #10: FStringBuilder.Append('\n');   // Line feed
-      #13: FStringBuilder.Append('\r');   // Carriage return
-      '"': FStringBuilder.Append('\"');   // Quote
-      '\': FStringBuilder.Append('\\');   // Backslash
-      else
-        if (C < #32) or (C = #127) then
-          // Control characters as unicode escapes
-          FStringBuilder.AppendFormat('\u%.4x', [Ord(C)])
-        else
-          FStringBuilder.Append(C);
-    end;
-  end;
-  FStringBuilder.Append('"');
-end;
-
-procedure TTOMLSerializer.WriteDateTime(const ADateTime: TTOMLDateTime);
-begin
-  FStringBuilder.Append(ADateTime.CanonicalText);
-end;
-
-procedure TTOMLSerializer.WriteArray(const AArray: TTOMLArray);
-var
-  i: Integer;
-  Item: TTOMLValue;
-  AllTables: Boolean;
-begin
-  // Check if this is an array of tables (all elements are tables)
-  AllTables := (AArray.Count > 0);
+  SetLength(Items, AArray.Count);
+  Width := AColumn + 2;
+  Wrap := False;
+  Pad := StringOfChar(' ', (AIndent + 1) * 2);
   for i := 0 to AArray.Count - 1 do
   begin
-    if AArray.GetItem(i).ValueType <> tvtTable then
-    begin
-      AllTables := False;
-      Break;
-    end;
+    Items[i] := FormatValue(AArray.GetItem(i), AIndent + 1, Length(Pad),
+      AAllowWrap);
+    Inc(Width, Length(Items[i]) + 2);
+    if Pos(LineEnding, Items[i]) > 0 then
+      Wrap := True;
   end;
-  
-  // Arrays of tables are handled specially during top-level serialization
-  if not AllTables then
+  Wrap := AAllowWrap and (Wrap or (Width > MaxLineWidth));
+
+  if not Wrap then
   begin
-    FStringBuilder.Append('[');
-    
-    if AArray.Count > 0 then
-    begin
-      for i := 0 to AArray.Count - 1 do
-      begin
-        if i > 0 then
-          FStringBuilder.Append(', ');
-        
-        Item := AArray.GetItem(i);
-        WriteValue(Item);
-      end;
-    end;
-    
-    FStringBuilder.Append(']');
+    Result := '[' + Items[0];
+    for i := 1 to High(Items) do
+      Result := Result + ', ' + Items[i];
+    Exit(Result + ']');
   end;
+
+  // One item per line, with a trailing comma for clean diffs.
+  Result := '[' + LineEnding;
+  for i := 0 to High(Items) do
+    Result := Result + Pad + Items[i] + ',' + LineEnding;
+  Result := Result + StringOfChar(' ', AIndent * 2) + ']';
 end;
 
-procedure TTOMLSerializer.WriteValue(const AValue: TTOMLValue);
+function TTOMLSerializer.FormatValue(const AValue: TTOMLValue;
+  AIndent, AColumn: Integer; AAllowWrap: Boolean): string;
 begin
+  if AValue = nil then
+    raise ETOMLSerializerException.Create('Cannot serialize a nil value');
+
   case AValue.ValueType of
     tvtString:
-      WriteString(AValue.AsString);
-      
+      Result := FormatTOMLString(AValue.AsString);
     tvtInteger:
-      FStringBuilder.Append(IntToStr(AValue.AsInteger));
-      
+      Result := IntToStr(AValue.AsInteger);
     tvtFloat:
-      FStringBuilder.Append(FloatToStr(AValue.AsFloat));
-      
+      Result := FormatTOMLFloat(AValue.AsFloat);
     tvtBoolean:
-      if AValue.AsBoolean then
-        FStringBuilder.Append('true')
-      else
-        FStringBuilder.Append('false');
-        
+      Result := BoolToStr(AValue.AsBoolean, 'true', 'false');
     tvtDateTime:
-      WriteDateTime(TTOMLDateTime(AValue));
-      
+      Result := (AValue as TTOMLDateTime).CanonicalText;
     tvtArray:
-      WriteArray(AValue.AsArray);
-      
+      Result := FormatArray(AValue.AsArray, AIndent, AColumn, AAllowWrap);
     tvtTable, tvtInlineTable:
-      WriteTable(AValue.AsTable, AValue.ValueType = tvtInlineTable);
+      Result := FormatInlineTable(AValue.AsTable);
+  else
+    raise ETOMLSerializerException.Create('Unsupported TOML value type');
   end;
 end;
 
-procedure TTOMLSerializer.WriteTable(const ATable: TTOMLTable; const AInline: Boolean = False);
+procedure TTOMLSerializer.WriteTableBody(const ATable: TTOMLTable;
+  const APath: string);
 var
-  First: Boolean;
   Pair: TTOMLKeyValuePair;
-  SubTable: TTOMLTable;
-  i: Integer;
-  ArrayValue: TTOMLArray;
-  AllTables: Boolean;
-  function BuildPath(const AKey: string): string;
-  var
-    i: Integer;
-  begin
-    Result := '';
-    for i := 0 to FCurrentPath.Count - 1 do
-    begin
-      if Result <> '' then
-        Result := Result + '.';
-      Result := Result + FormatKey(FCurrentPath[i]);
-    end;
-
-    if AKey <> '' then
-    begin
-      if Result <> '' then
-        Result := Result + '.';
-      Result := Result + FormatKey(AKey);
-    end;
-  end;
+  Item: TTOMLValue;
+  Key, Path: string;
 begin
-  if AInline then
+  // 1. Plain key/value pairs belong to the current section.
+  for Pair in ATable do
+    if not IsSection(Pair.Value) then
+    begin
+      Key := FormatTOMLKey(Pair.Key);
+      FBuilder.Append(Key);
+      FBuilder.Append(' = ');
+      FBuilder.Append(FormatValue(Pair.Value, 0, Length(Key) + 3, True));
+      FBuilder.Append(LineEnding);
+    end;
+
+  // 2. Sub-tables and arrays of tables, in insertion order.
+  for Pair in ATable do
   begin
-    // Write inline table format: { key1 = value1, key2 = value2 }
-    FStringBuilder.Append('{');
-    First := True;
-    
-    for Pair in ATable.Items do
-    begin
-      if not First then
-        FStringBuilder.Append(', ')
-      else
-        First := False;
-        
-      WriteKey(Pair.Key);
-      FStringBuilder.Append(' = ');
-      WriteValue(Pair.Value);
-    end;
-    
-    FStringBuilder.Append('}');
-  end
-  else
-  begin
-    // First write all non-array and non-table values
-    for Pair in ATable.Items do
-    begin
-      if not ((Pair.Value.ValueType = tvtTable) or 
-              ((Pair.Value.ValueType = tvtArray) and (Pair.Value.AsArray.Count > 0) and 
-               (Pair.Value.AsArray.GetItem(0).ValueType = tvtTable))) then
-      begin
-        // Remove indentation for table key-value pairs
-        WriteKey(Pair.Key);
-        FStringBuilder.Append(' = ');
-        WriteValue(Pair.Value);
-        WriteLine;
-      end;
-    end;
-    
-    // Then write arrays of tables
-    for Pair in ATable.Items do
-    begin
-      if (Pair.Value.ValueType = tvtArray) and (Pair.Value.AsArray.Count > 0) then
-      begin
-        ArrayValue := Pair.Value.AsArray;
-        
-        // Check if this is an array of tables
-        AllTables := True;
-        for i := 0 to ArrayValue.Count - 1 do
-        begin
-          if ArrayValue.GetItem(i).ValueType <> tvtTable then
-          begin
-            AllTables := False;
-            Break;
-          end;
-        end;
-        
-        if AllTables then
-        begin
-          // Write as array of tables [[key]]
-          for i := 0 to ArrayValue.Count - 1 do
-          begin
-            if i > 0 then
-              WriteLine;
-            WriteLine('[[' + BuildPath(Pair.Key) + ']]');
+    if not IsSection(Pair.Value) then
+      Continue;
+    Path := JoinPath(APath, Pair.Key);
 
-            FCurrentPath.Add(Pair.Key);
-            try
-              WriteTable(ArrayValue.GetItem(i).AsTable);
-            finally
-              FCurrentPath.Delete(FCurrentPath.Count - 1);
-            end;
-          end;
-          continue;
-        end;
-      end;
-      
-      // Handle regular tables with path tracking
-      if Pair.Value.ValueType = tvtTable then
+    if Pair.Value.ValueType = tvtTable then
+    begin
+      if not IsImplicitTable(Pair.Value.AsTable) then
+        WriteHeader('[' + Path + ']');
+      WriteTableBody(Pair.Value.AsTable, Path);
+    end
+    else
+      for Item in Pair.Value.AsArray do
       begin
-        SubTable := Pair.Value.AsTable;
-        
-        WriteLine;
-
-        WriteLine('[' + BuildPath(Pair.Key) + ']');
-
-        if SubTable.Items.Count > 0 then
-        begin
-          FCurrentPath.Add(Pair.Key);
-          try
-            WriteTable(SubTable);
-          finally
-            FCurrentPath.Delete(FCurrentPath.Count - 1);
-          end;
-        end;
+        WriteHeader('[[' + Path + ']]');
+        WriteTableBody(Item.AsTable, Path);
       end;
-    end;
   end;
 end;
 
 function TTOMLSerializer.Serialize(const AValue: TTOMLValue): string;
 begin
-  FStringBuilder.Clear;
-  WriteValue(AValue);
-  Result := FStringBuilder.ToString;
+  FBuilder.Clear;
+  if AValue is TTOMLTable then
+    WriteTableBody(TTOMLTable(AValue), '')
+  else
+    FBuilder.Append(FormatValue(AValue, 0, 0, True));
+  Result := FBuilder.ToString;
 end;
+
+initialization
+  InvariantFormat := DefaultFormatSettings;
+  InvariantFormat.DecimalSeparator := '.';
+  InvariantFormat.ThousandSeparator := #0;
 
 end.

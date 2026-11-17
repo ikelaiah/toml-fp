@@ -22,7 +22,7 @@ Thank you for your interest in contributing to TOML-FP! This document provides g
 - Add tests for new features
 - Ensure all tests pass before submitting PR
 - Run both clean build modes: `lazbuild --build-all --build-mode=Debug tests/TestRunner.lpi` and `lazbuild --build-all --build-mode=Release tests/TestRunner.lpi`
-- For parser changes, run the pinned conformance gate described in `tests/conformance/README.md`
+- For parser or serializer changes, run the pinned conformance gate described in `tests/conformance/README.md`
 - Run `bash scripts/check-release-metadata.sh` after changing versions, test counts or release documents; CI runs it too
 
 

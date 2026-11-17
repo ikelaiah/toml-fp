@@ -183,14 +183,16 @@ jobs:
           test "$(lazbuild --version)" = "4.8"
           test "$(fpc -iV)" = "3.2.2"
 
-      - name: Build toml-test decoder
+      - name: Build toml-test decoder and encoder
         shell: bash
         run: |
           mkdir -p tests/conformance/lib
-          fpc -MObjFPC -Sh -Fu./src \
-            -FU./tests/conformance/lib \
-            -FE./tests/conformance \
-            ./tests/conformance/TOMLTestDecoder.lpr
+          for adapter in TOMLTestDecoder TOMLTestEncoder; do
+            fpc -MObjFPC -Sh -Fu./src \
+              -FU./tests/conformance/lib \
+              -FE./tests/conformance \
+              "./tests/conformance/$adapter.lpr"
+          done
 
       - name: Download toml-test v2.2.0
         shell: bash

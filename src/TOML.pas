@@ -1,25 +1,16 @@
 { TOML.pas
-  This is the main unit of the TOML library that provides high-level functionality for working with TOML data.
-  It re-exports the main types and provides helper functions for parsing and serializing TOML data.
-  
-  The unit follows the TOML v1.1.0 specification and provides a clean, type-safe interface for:
-  - Parsing TOML from strings and files
-  - Serializing TOML data structures to strings and files
-  - Creating and manipulating TOML data structures
-  - Type-safe access to TOML values
-  
-  Example usage:
-    var
-      Table: TTOMLTable;
-    begin
-      // Parse TOML from string
-      Table := ParseTOML('key = "value"');
-      try
-        // Use the table...
-      finally
-        Table.Free;
-      end;
-    end;
+  The one unit most programs need: `uses TOML;`
+
+  Parse:      Config := ParseTOMLFromFile('config.toml');
+  Read:       Port := Config.GetInteger(['server', 'port'], 8080);
+  Build:      Config.Add('name', TOMLString('demo'));
+  Serialize:  WriteLn(SerializeTOML(Config));
+  Clean up:   Config.Free;  // frees every nested value
+
+  Follows the TOML v1.1.0 specification. Unit layout:
+    TOML.Types       value classes (TTOMLTable, TTOMLArray, ...)
+    TOML.Parser      text -> value tree
+    TOML.Serializer  value tree -> text
 }
 unit TOML;
 
@@ -41,6 +32,7 @@ type
   TTOMLDateTime = TOML.Types.TTOMLDateTime;
   TTOMLArray = TOML.Types.TTOMLArray;
   TTOMLTable = TOML.Types.TTOMLTable;
+  TTOMLKeyValuePair = TOML.Types.TTOMLKeyValuePair;
   
   { Re-export exception types }
   ETOMLException = TOML.Types.ETOMLException;
@@ -114,12 +106,10 @@ function ParseTOMLFromFile(const AFileName: string): TTOMLTable;
   @raises ETOMLSerializerException if the value cannot be serialized }
 function SerializeTOML(const AValue: TTOMLValue): string;
 
-{ Serializes a TOML value to a file
+{ Serializes a TOML value to a UTF-8 file, replacing any existing file
   @param AValue The TOML value to serialize
   @param AFileName The path to the output file
-  @returns True if successful, False otherwise
-  @raises ETOMLSerializerException if the value cannot be serialized
-  @raises EFileStreamError if the file cannot be written }
+  @returns True if the file was written, False on any error }
 function SerializeTOMLToFile(const AValue: TTOMLValue; const AFileName: string): Boolean;
 
 implementation

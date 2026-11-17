@@ -3,19 +3,15 @@ program ArrayOfTablesTOML;
 {$mode objfpc}{$H+}{$J-}
 
 uses
-  SysUtils, Classes, TOML, TOML.Types, Generics.Collections;
-  
-type
-  { Key-Value pair type for TOML tables }
-  TTOMLKeyValuePair = specialize TPair<string, TTOMLValue>;
-  
+  SysUtils, Classes, TOML, TOML.Types;
+
 procedure DumpTOMLTableContents(const Table: TTOMLTable; const Indent: string = '');
 var
   Pair: TTOMLKeyValuePair;
   i: Integer;
   ItemTable: TTOMLTable;
 begin
-  for Pair in Table.Items do
+  for Pair in Table do  // visits keys in document order
   begin
     Write(Indent, Pair.Key, ' = ');
     
