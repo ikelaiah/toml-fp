@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+### v1.2.0 - Faithful Serializer and Friendlier API (2026-11-17)
+
+- Tables keep keys in insertion order; parsed documents serialize back in their original order.
+- Added `TTOMLTable` lookups: `GetString`, `GetInteger`, `GetFloat`, `GetBoolean` (by path, with defaults), `GetTable`, `GetArray`, `FindPath`, `Find`, `Contains`, plus `Remove`, `Count`, `Keys[]`, `Values[]` and ordered `for Pair in Table`. Added `for Item in Arr` on `TTOMLArray`.
+- Fixed serializer data loss: arrays mixing tables with other values, and arrays of arrays of tables, were dropped or written as invalid TOML. Tables inside arrays are now written inline.
+- Fixed floats: `1.0` was written as `1` (read back as an integer), `inf`/`nan` as `+Inf`/`Nan`, a comma decimal separator under some locales, and precision was cut to 15 digits. Floats now use the shortest exact form.
+- Output polish: no leading blank line, no `[parent]` header for tables that only hold sub-tables, `\f` escape, long arrays wrap one item per line.
+- `TOMLDateTime(Now)` is written as a local date-time (no false `Z` offset, no `.000`).
+- Duplicate-key errors report the line: `Duplicate key "a" at line 3`.
+- `SerializeTOMLToFile` writes the exact serialized bytes.
+- Added the official `toml-test` encoder gate (`tests/conformance/TOMLTestEncoder.lpr`): 214/214 encoder cases pass, alongside 214/214 valid and 467/467 invalid decoder cases.
+- Expanded the project suite from 94 to 108 tests.
+- Behavior notes: serialized output differs from v1.1.0 (key order, float spelling, headers); `TTOMLDateTime.Create(TDateTime)` now has `Kind = tdtLocalDateTime`.
+
 ### v1.1.0 - TOML 1.1.0 Support (2026-10-30)
 
 - Added TOML 1.1.0 syntax: `\e` and `\xHH` escapes in basic strings, optional seconds in date-time and time values, and newlines, comments and trailing commas in inline tables.

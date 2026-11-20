@@ -34,4 +34,6 @@ Thumbs.db
 
 # Project specific binary output
 tests/TestRunner
-tests/TestRunner.exe 
+tests/TestRunner.exe
+tests/conformance/TOMLTestDecoder
+tests/conformance/TOMLTestEncoder

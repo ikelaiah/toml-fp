@@ -124,6 +124,21 @@ type
     procedure Test94_Int64Boundaries;
     procedure Test95_ArrayOfTablesBracketsMustBeAdjacent;
     procedure Test96_SerializerEscapesDelete;
+    { Data model and serializer quality }
+    procedure Test97_TableKeepsInsertionOrder;
+    procedure Test98_SerializerKeepsDocumentOrder;
+    procedure Test99_FloatsRoundTripExactly;
+    procedure Test100_FloatOutputIgnoresLocale;
+    procedure Test101_TablesInsideArraysAreInline;
+    procedure Test102_MixedArraysAreNeverDropped;
+    procedure Test103_ImplicitParentHeaderOmitted;
+    procedure Test104_LongArraysWrap;
+    procedure Test105_PathLookups;
+    procedure Test106_RemoveFreesValue;
+    procedure Test107_StringControlEscapes;
+    procedure Test108_TDateTimeSerializesAsLocal;
+    procedure Test109_DuplicateKeyReportsLine;
+    procedure Test110_SerializeToFileWritesExactText;
   end;
 
 implementation
@@ -536,7 +551,7 @@ begin
     InnerTable.Add('inner', TOMLString('value'));
     Table.Add('outer', InnerTable);
     TOML := SerializeTOML(Table);
-    AssertEquals('Serialized table matches', LineEnding + '[outer]' + LineEnding + 'inner = "value"' + LineEnding, TOML);
+    AssertEquals('Serialized table matches', '[outer]' + LineEnding + 'inner = "value"' + LineEnding, TOML);
   finally
     Table.Free;
   end;
@@ -554,7 +569,7 @@ begin
     InnerTable.Add('key', TOMLString('value'));
     Table.Add('table.nested', InnerTable);
     TOML := SerializeTOML(Table);
-    AssertEquals('Serialized nested table matches', LineEnding + '["table.nested"]' + LineEnding + 'key = "value"' + LineEnding, TOML);
+    AssertEquals('Serialized nested table matches', '["table.nested"]' + LineEnding + 'key = "value"' + LineEnding, TOML);
   finally
     Table.Free;
   end;
@@ -2432,6 +2447,314 @@ begin
     end;
   finally
     Doc.Free;
+  end;
+end;
+
+function SerializeSingle(const AKey: string; AValue: TTOMLValue): string;
+var
+  Table: TTOMLTable;
+begin
+  Table := TOMLTable;
+  try
+    Table.Add(AKey, AValue);
+    Result := SerializeTOML(Table);
+  finally
+    Table.Free;
+  end;
+end;
+
+function RoundTrip(const ADocument: string): string;
+var
+  Doc: TTOMLTable;
+begin
+  Doc := ParseTOML(ADocument);
+  try
+    Result := SerializeTOML(Doc);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test97_TableKeepsInsertionOrder;
+var
+  Table: TTOMLTable;
+  Pair: TTOMLKeyValuePair;
+  Seen: string;
+  i: Integer;
+begin
+  Table := TOMLTable;
+  try
+    Table.Add('zeta', TOMLInteger(1));
+    Table.Add('alpha', TOMLInteger(2));
+    Table.Add('mid', TOMLInteger(3));
+    AssertEquals('Count', 3, Table.Count);
+    Seen := '';
+    for Pair in Table do
+      Seen := Seen + Pair.Key + ',';
+    AssertEquals('for..in order', 'zeta,alpha,mid,', Seen);
+    Seen := '';
+    for i := 0 to Table.Count - 1 do
+      Seen := Seen + Table.Keys[i] + '=' + IntToStr(Table.Values[i].AsInteger) + ',';
+    AssertEquals('Keys/Values order', 'zeta=1,alpha=2,mid=3,', Seen);
+  finally
+    Table.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test98_SerializerKeepsDocumentOrder;
+var
+  Source: string;
+begin
+  Source := Join([
+    'title = "demo"',
+    'version = 2',
+    '',
+    '[server]',
+    'port = 8080',
+    'host = "localhost"',
+    '',
+    '[[server.routes]]',
+    'path = "/"',
+    '',
+    '[[server.routes]]',
+    'path = "/api"',
+    '',
+    '[client]',
+    'retries = 3']);
+  AssertEquals('Round trip is byte-identical', Source, RoundTrip(Source));
+end;
+
+procedure TTOMLTestCase.Test99_FloatsRoundTripExactly;
+const
+  Values: array[0..8] of Double = (
+    1.0, 0.1, 3.141592653589793, 1e300, 5e-324, -2.5,
+    9007199254740991.0, 1.5e-7, 100.0);
+  Expected: array[0..8] of string = (
+    '1.0', '0.1', '3.141592653589793', '1e300', '5e-324', '-2.5',
+    '9007199254740991.0', '1.5e-7', '100.0');
+var
+  i: Integer;
+  Doc: TTOMLTable;
+  Value: TTOMLValue;
+  Text: string;
+begin
+  for i := Low(Values) to High(Values) do
+  begin
+    Text := SerializeSingle('f', TOMLFloat(Values[i]));
+    AssertEquals('Text of ' + Expected[i], 'f = ' + Expected[i] + LineEnding, Text);
+    Doc := ParseTOML(Text);
+    try
+      AssertTrue('Reads back ' + Expected[i], Doc.TryGetValue('f', Value));
+      AssertTrue('Still a float: ' + Expected[i], Value.ValueType = tvtFloat);
+      AssertTrue('Exact value: ' + Expected[i], Value.AsFloat = Values[i]);
+    finally
+      Doc.Free;
+    end;
+  end;
+
+  AssertEquals('inf', 'f = inf' + LineEnding, SerializeSingle('f', TOMLFloat(Infinity)));
+  AssertEquals('-inf', 'f = -inf' + LineEnding, SerializeSingle('f', TOMLFloat(NegInfinity)));
+  AssertEquals('nan', 'f = nan' + LineEnding, SerializeSingle('f', TOMLFloat(NaN)));
+  AssertEquals('-0.0', 'f = -0.0' + LineEnding, SerializeSingle('f', TOMLFloat(-0.0)));
+end;
+
+procedure TTOMLTestCase.Test100_FloatOutputIgnoresLocale;
+var
+  Saved: Char;
+begin
+  Saved := DefaultFormatSettings.DecimalSeparator;
+  DefaultFormatSettings.DecimalSeparator := ',';
+  try
+    AssertEquals('Decimal point is always "."', 'f = 3.14' + LineEnding,
+      SerializeSingle('f', TOMLFloat(3.14)));
+  finally
+    DefaultFormatSettings.DecimalSeparator := Saved;
+  end;
+end;
+
+procedure TTOMLTestCase.Test101_TablesInsideArraysAreInline;
+begin
+  AssertEquals('Inline table after a scalar',
+    'a = [1, { x = 1 }]' + LineEnding, RoundTrip('a = [1, {x = 1}]'));
+  AssertEquals('Array of arrays of tables',
+    'a = [[{ x = 1 }], []]' + LineEnding, RoundTrip('a = [[{x=1}], []]'));
+  AssertEquals('An array holding one empty table is an array of tables',
+    '[[a]]' + LineEnding, RoundTrip('a = [{}]'));
+end;
+
+procedure TTOMLTestCase.Test102_MixedArraysAreNeverDropped;
+var
+  Doc: TTOMLTable;
+begin
+  AssertEquals('Table first, scalar second',
+    'a = [{ x = 1 }, 2]' + LineEnding, RoundTrip('a = [{x = 1}, 2]'));
+  Doc := ParseTOML(RoundTrip('a = [{x = 1}, 2]'));
+  try
+    AssertEquals('Both items survive', 2, Doc.GetArray(['a']).Count);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test103_ImplicitParentHeaderOmitted;
+var
+  Root, Server, Http: TTOMLTable;
+begin
+  Root := TOMLTable;
+  try
+    Server := TOMLTable;
+    Http := TOMLTable;
+    Http.Add('port', TOMLInteger(80));
+    Server.Add('http', Http);
+    Root.Add('server', Server);
+    AssertEquals('Only the leaf header is written',
+      '[server.http]' + LineEnding + 'port = 80' + LineEnding, SerializeTOML(Root));
+
+    Server.Add('empty', TOMLTable);
+    AssertEquals('An empty table keeps its header',
+      '[server.http]' + LineEnding + 'port = 80' + LineEnding + LineEnding +
+      '[server.empty]' + LineEnding, SerializeTOML(Root));
+  finally
+    Root.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test104_LongArraysWrap;
+var
+  Numbers: TTOMLArray;
+  i: Integer;
+  Text: string;
+  Doc: TTOMLTable;
+begin
+  AssertEquals('Short arrays stay on one line',
+    'a = [1, 2, 3]' + LineEnding, RoundTrip('a = [1, 2, 3]'));
+
+  Numbers := TOMLArray;
+  for i := 1000 to 1029 do
+    Numbers.Add(TOMLInteger(i));
+  Text := SerializeSingle('numbers', Numbers);
+  AssertEquals('Long array opens on its own line', 1,
+    Pos('numbers = [' + LineEnding + '  1000,' + LineEnding, Text));
+  AssertTrue('Long array closes on its own line',
+    Pos('  1029,' + LineEnding + ']' + LineEnding, Text) > 0);
+  Doc := ParseTOML(Text);
+  try
+    AssertEquals('Every item survives', 30, Doc.GetArray(['numbers']).Count);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test105_PathLookups;
+var
+  Doc: TTOMLTable;
+  Raised: Boolean;
+begin
+  Doc := ParseTOML(Join(['[server]', 'port = 8080', 'name = "web"', 'debug = true',
+    'ratio = 2']));
+  try
+    AssertEquals('Integer by path', 8080, Doc.GetInteger(['server', 'port'], 1));
+    AssertEquals('String by path', 'web', Doc.GetString(['server', 'name']));
+    AssertTrue('Boolean by path', Doc.GetBoolean(['server', 'debug']));
+    AssertEquals('Integer widens to float', 2.0, Doc.GetFloat(['server', 'ratio']), 0);
+    AssertEquals('Default for a missing key', 7, Doc.GetInteger(['server', 'missing'], 7));
+    AssertEquals('Default for a missing parent', 'd', Doc.GetString(['nope', 'deeper'], 'd'));
+    AssertNull('Cannot walk through a scalar', Doc.FindPath(['server', 'port', 'x']));
+    AssertNotNull('Table by path', Doc.GetTable(['server']));
+    AssertNull('Not an array', Doc.GetArray(['server']));
+    AssertTrue('Contains', Doc.Contains('server'));
+    AssertNull('Find missing', Doc.Find('zzz'));
+
+    Raised := False;
+    try
+      Doc.GetInteger(['server', 'name']);
+    except
+      on E: ETOMLException do
+        Raised := True;
+    end;
+    AssertTrue('Wrong type raises instead of returning the default', Raised);
+  finally
+    Doc.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test106_RemoveFreesValue;
+var
+  Table: TTOMLTable;
+begin
+  Table := ParseTOML(Join(['a = 1', 'b = [1, 2]', 'c = 3']));
+  try
+    AssertTrue('Remove existing key', Table.Remove('b'));
+    AssertFalse('Remove missing key', Table.Remove('b'));
+    AssertEquals('Count after remove', 2, Table.Count);
+    AssertEquals('Order after remove', Join(['a = 1', 'c = 3']), SerializeTOML(Table));
+    Table.Add('b', TOMLInteger(2));
+    AssertEquals('Re-added key goes last', Join(['a = 1', 'c = 3', 'b = 2']),
+      SerializeTOML(Table));
+  finally
+    Table.Free;
+  end;
+end;
+
+procedure TTOMLTestCase.Test107_StringControlEscapes;
+begin
+  AssertEquals('Short escapes and \u for the rest',
+    's = "\u0000a\fb\u001Bc\td"' + LineEnding,
+    SerializeSingle('s', TOMLString(#0'a'#12'b'#27'c'#9'd')));
+  AssertEquals('UTF-8 passes through', 's = "caf' + #$C3#$A9 + '"' + LineEnding,
+    SerializeSingle('s', TOMLString('caf' + #$C3#$A9)));
+end;
+
+procedure TTOMLTestCase.Test108_TDateTimeSerializesAsLocal;
+var
+  Value: TTOMLDateTime;
+begin
+  Value := TOMLDateTime(EncodeDate(2026, 11, 17) + EncodeTime(9, 30, 0, 0));
+  AssertTrue('TDateTime has no zone, so it is local', Value.Kind = tdtLocalDateTime);
+  AssertEquals('No offset, no zero milliseconds', 'd = 2026-11-17T09:30:00' + LineEnding,
+    SerializeSingle('d', Value));
+  AssertEquals('Milliseconds when present', 'd = 2026-11-17T09:30:00.250' + LineEnding,
+    SerializeSingle('d', TOMLDateTime(EncodeDate(2026, 11, 17) + EncodeTime(9, 30, 0, 250))));
+end;
+
+procedure TTOMLTestCase.Test109_DuplicateKeyReportsLine;
+var
+  Message: string;
+begin
+  Message := '';
+  try
+    ParseTOML(Join(['a = 1', 'b = 2', 'a = 3'])).Free;
+  except
+    on E: ETOMLParserException do
+      Message := E.Message;
+  end;
+  AssertTrue('Duplicate rejected with its line: ' + Message,
+    Pos('Duplicate key "a" at line 3', Message) > 0);
+end;
+
+procedure TTOMLTestCase.Test110_SerializeToFileWritesExactText;
+var
+  Doc: TTOMLTable;
+  FileName: string;
+  Stream: TStringStream;
+begin
+  FileName := GetTempFileName;
+  Doc := ParseTOML(Join(['name = "caf' + #$C3#$A9 + '"', '', '[t]', 'x = 1']));
+  try
+    AssertTrue('File written', SerializeTOMLToFile(Doc, FileName));
+    Stream := TStringStream.Create('');
+    try
+      Stream.LoadFromFile(FileName);
+      AssertEquals('File holds exactly the serialized text', SerializeTOML(Doc),
+        Stream.DataString);
+    finally
+      Stream.Free;
+    end;
+    AssertFalse('Unwritable path returns False',
+      SerializeTOMLToFile(Doc, IncludeTrailingPathDelimiter(FileName) + 'x.toml'));
+  finally
+    Doc.Free;
+    DeleteFile(FileName);
   end;
 end;
 

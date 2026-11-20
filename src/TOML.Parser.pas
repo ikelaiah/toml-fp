@@ -54,8 +54,8 @@ type
     SpaceBefore: Boolean;   // Whitespace or a comment preceded the token
   end;
 
-  { Key-Value pair type for TOML tables }
-  TTOMLKeyValuePair = specialize TPair<string, TTOMLValue>;
+  { Key-Value pair type for TOML tables (alias of the TOML.Types type) }
+  TTOMLKeyValuePair = TOML.Types.TTOMLKeyValuePair;
 
   { How a table or array came to exist; decides whether later syntax may
     extend or redefine it }
@@ -249,7 +249,7 @@ type
 
     { Adds a parsed key path to a table, creating implicit tables for dotted keys. }
     procedure AddKeyValue(ATable: TTOMLTable; const AEncodedKey: string;
-      AValue: TTOMLValue; ASection: Integer);
+      AValue: TTOMLValue; ASection, ALine: Integer);
   public
     { Creates a new parser instance
       @param AInput The TOML input string to parse }
@@ -1583,7 +1583,7 @@ end;
 function TTOMLParser.ParseInlineTable: TTOMLTable;
 var
   KeyPair: TTOMLKeyValuePair;
-  Section: Integer;
+  Section, KeyLine: Integer;
 begin
   Result := TTOMLTable.Create;
   Inc(FSectionId);
@@ -1596,9 +1596,10 @@ begin
     SkipNewLines(True);
     while FCurrentToken.TokenType <> ttRBrace do
     begin
+      KeyLine := FCurrentToken.Line;
       KeyPair := ParseKeyValue;
       try
-        AddKeyValue(Result, KeyPair.Key, KeyPair.Value, Section);
+        AddKeyValue(Result, KeyPair.Key, KeyPair.Value, Section, KeyLine);
       except
         KeyPair.Value.Free;
         raise;
@@ -1774,7 +1775,7 @@ begin
 end;
 
 procedure TTOMLParser.AddKeyValue(ATable: TTOMLTable;
-  const AEncodedKey: string; AValue: TTOMLValue; ASection: Integer);
+  const AEncodedKey: string; AValue: TTOMLValue; ASection, ALine: Integer);
 var
   Position, ColonPosition, PartLength: Integer;
   KeyPart: string;
@@ -1802,6 +1803,9 @@ begin
 
     if Position > Length(AEncodedKey) then
     begin
+      if CurrentTable.Contains(KeyPart) then
+        raise ETOMLParserException.CreateFmt(
+          'Duplicate key "%s" at line %d', [KeyPart, ALine]);
       CurrentTable.Add(KeyPart, AValue);
       Exit;
     end;
@@ -1827,7 +1831,7 @@ end;
 function TTOMLParser.Parse: TTOMLTable;
 var
   CurrentTable: TTOMLTable;
-  CurrentSection: Integer;
+  CurrentSection, KeyLine: Integer;
   TablePath: TStringList;
   KeyPair: TTOMLKeyValuePair;
   IsArrayOfTables: Boolean;
@@ -1886,9 +1890,11 @@ begin
           ttIdentifier, ttString, ttInteger, ttFloat, ttDateTime:
           begin
             try
+              KeyLine := FCurrentToken.Line;
               KeyPair := ParseKeyValue;
               try
-                AddKeyValue(CurrentTable, KeyPair.Key, KeyPair.Value, CurrentSection);
+                AddKeyValue(CurrentTable, KeyPair.Key, KeyPair.Value,
+                  CurrentSection, KeyLine);
               except
                 KeyPair.Value.Free;
                 raise;

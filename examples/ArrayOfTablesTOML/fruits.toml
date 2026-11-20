@@ -1,7 +1,7 @@
 [[fruits]]
-color = "red"
 name = "apple"
+color = "red"
 
 [[fruits]]
-color = "yellow"
 name = "banana"
+color = "yellow"
