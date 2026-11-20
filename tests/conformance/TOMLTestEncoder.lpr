@@ -6,6 +6,10 @@ program TOMLTestEncoder;
 {$mode objfpc}{$H+}{$J-}
 
 uses
+  {$IFDEF UNIX}
+  cwstring,  // fpjson converts strings through UnicodeString; without a
+             // widestring manager Unix turns every non-ASCII character into '?'
+  {$ENDIF}
   SysUtils, Classes, Math, fpjson, jsonparser, TOML, TOML.Types;
 
 var
@@ -165,6 +169,8 @@ var
   Document: TTOMLValue;
   Output: string;
 begin
+  // Treat strings as UTF-8 whatever the runner's locale is.
+  DefaultSystemCodePage := CP_UTF8;
   InvariantFormat := DefaultFormatSettings;
   InvariantFormat.DecimalSeparator := '.';
   JSON := nil;

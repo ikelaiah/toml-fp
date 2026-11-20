@@ -213,6 +213,7 @@ var
   Decimal: TFloatRec;
   Digits: string;
   Precision: Integer;
+  ReadBack: Double;
 begin
   if IsNan(AValue) then
     Exit('nan');
@@ -236,7 +237,10 @@ begin
     while (Length(Digits) > 1) and (Digits[Length(Digits)] = '0') do
       SetLength(Digits, Length(Digits) - 1);
     Result := LayOutFloat(Digits, Decimal.Exponent, Decimal.Negative);
-    if StrToFloat(Result, InvariantFormat) = AValue then
+    // Round to Double before comparing: StrToFloat returns Extended, which
+    // is 80-bit on x86 Linux and would never equal a Double denormal.
+    ReadBack := StrToFloat(Result, InvariantFormat);
+    if ReadBack = AValue then
       Exit;
   end;
 end;
