@@ -241,6 +241,12 @@ jobs:
           # Pre-release tags (v1.1.0-rc1) share the notes of their final version.
           notes="docs/Release-Notes-${GITHUB_REF_NAME%%-*}.md"
           test -f "$notes"
+          # --title sets the release title, so drop the file's leading
+          # "# ..." heading and the blank lines after it from the body.
+          body="$RUNNER_TEMP/release-body.md"
+          awk 'NR == 1 && /^# / { skip = 1; next }
+               skip && /^[[:space:]]*$/ { next }
+               { skip = 0; print }' "$notes" > "$body"
           prerelease=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
             prerelease=(--prerelease)
@@ -248,5 +254,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --verify-tag \
             --title "TOML-FP ${GITHUB_REF_NAME}" \
-            --notes-file "$notes" \
+            --notes-file "$body" \
             ${prerelease[@]+"${prerelease[@]}"}
